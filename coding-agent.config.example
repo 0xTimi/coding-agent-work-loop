@@ -52,6 +52,16 @@ WORKTREE_SETUP_CMD="npm ci || npm install"
 # 典型场景：.env / 任何 commit 不到 git 的本地配置文件
 COPY_TO_WORKTREE=".env"
 
+# ── Worker 身份（commit author / pusher 显示成谁）──
+# 默认空 = worktree 用你 global ~/.gitconfig 的 user.name/email（也就是你自己）
+# 想让 worker 的 commit / push 显示为单独的 bot 账号，在这里写 bot 的身份：
+#   WORKTREE_GIT_USER_NAME="my-bot"
+#   WORKTREE_GIT_USER_EMAIL="<numeric-id>+my-bot@users.noreply.github.com"
+# 注意：这只控制 commit author。push 用谁的 token 还看 GH_TOKEN (EnvironmentFile) +
+# ~/.git-credentials 的路径路由，要一致设置才能 attribution 干净。
+WORKTREE_GIT_USER_NAME=""
+WORKTREE_GIT_USER_EMAIL=""
+
 # ── Claude Code 启动 ──
 # 启动 claude 时的额外 flag。--dangerously-skip-permissions 强烈推荐，否则会卡权限弹窗。
 CLAUDE_EXTRA_FLAGS="--dangerously-skip-permissions"
