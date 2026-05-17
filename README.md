@@ -234,6 +234,28 @@ body → 内嵌的 `[SYSTEM]` 段尝试劫持 Claude。Claude 通常能识破（
 | **PR-only 流程** | worker 只 push 到 feature branch + 开 PR，不直接动 main | 你 review + merge 是必经关 |
 | **本地 daemon** | worker 跑在你本机 / NAS 受信环境，不暴露到云端 Action 多租户环境 | 凭据不离机 |
 
+### 什么**不会**触发 daemon（哪怕 label 没翻、有匿名评论）
+
+容易担心：PR merge 完忘记把 `pending/agent` 翻成 `pending/human`，attacker 跑去
+那个已 merge 的 PR 下塞个评论——会触发 worker 吗？**不会**，daemon 默认就过滤了：
+
+| daemon 哪条查询 | gh 查询 | 状态过滤 | 影响 |
+|-----------------|---------|----------|------|
+| 新 issue 派工 | `gh issue list --state open` | 显式 open | closed issue 永远不入扫描 |
+| PR 评论派工 | `gh pr list --label ...` | 默认 open | merged/closed PR 永远不入扫描 |
+| Auto-cleanup | `gh pr list --state merged` | 显式 merged | 只为 cleanup，**不读 user content** |
+
+`cleanup-issue.sh` 的执行路径里**没有任何 `gh ... view --comments` / LLM 调用**——
+只做：busy 检查 → `CLEANUP_HOOK`（你写的脚本，比如解 tailscale）→ 杀 tmux →
+删 worktree → 可选删本地分支。匿名评论塞在那的 prompt injection 进不了任何
+推理上下文。
+
+唯一例外：**collaborator** 把 closed issue / PR re-open，且 label 仍是 `pending/agent`，
+之后又来评论 → 会被看到。但 re-open 是 collaborator-only 动作，仍在原 trust gate 内。
+
+> 实际操作：merge 完忘了翻 label 没关系——状态污染，不是安全漏洞。daemon 的
+> auto-cleanup 也会顺手把 worktree / session 收掉，状态最终收敛。
+
 ### 操作纪律（**最重要的一道墙**）
 
 **Prompt 硬化挡得住 90%，挡不住的那部分靠你**。打 `pending/agent` 之前：
