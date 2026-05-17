@@ -68,6 +68,20 @@ branch_to_issue_num() {
     fi
 }
 
+# 构造 tmux new-session 的 -e 参数，把 WORKER_PASS_ENV 列的 env 透传给 worker。
+# tmux 默认不继承父 shell 的 env，必须显式 -e VAR=VALUE。
+# 默认透传 GH_TOKEN（让 worker 里的 gh CLI 用正确的 PAT，而不是 fallback 到 gh auth 默认账号）。
+tmux_env_args() {
+    local vars="${WORKER_PASS_ENV:-GH_TOKEN}"
+    for var in $vars; do
+        local val
+        eval "val=\${$var:-}"
+        if [ -n "$val" ]; then
+            printf -- '-e\0%s=%s\0' "$var" "$val"
+        fi
+    done
+}
+
 tmux_session_name() {
     echo "${TMUX_PREFIX}-${SESSION_NAME_PREFIX}$1"
 }

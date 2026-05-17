@@ -51,6 +51,12 @@ COPY_TO_WORKTREE=".env"
 # 启动 claude 时的额外 flag。--dangerously-skip-permissions 强烈推荐，否则会卡权限弹窗。
 CLAUDE_EXTRA_FLAGS="--dangerously-skip-permissions"
 
+# ── 传给 worker 的 env ──
+# tmux 默认不继承父 shell 的 env，要透传必须列在这里（空格分隔）。
+# GH_TOKEN 强烈推荐：让 worker 里的 gh CLI 用 systemd EnvironmentFile 里的 PAT，
+# 而不是回退到 ~/.config/gh/ 默认账号（多账号场景常见坑）。
+WORKER_PASS_ENV="GH_TOKEN"
+
 # ── 并发上限 ──
 # 同一时刻最多多少个 worker session 同时存活。建议 1（串行最稳）。
 MAX_CONCURRENT_WORKERS=1

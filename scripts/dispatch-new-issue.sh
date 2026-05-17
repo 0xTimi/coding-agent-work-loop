@@ -44,9 +44,10 @@ else
 EOF
 fi
 
-# 4. 起 tmux + claude
+# 4. 起 tmux + claude（用 -e 显式传 GH_TOKEN 等 env，因为 tmux 默认不继承）
 log "spawn $TMUX_SESSION in $WORKTREE"
-tmux new-session -d -s "$TMUX_SESSION" -c "$WORKTREE" \
+mapfile -d '' -t tmux_env < <(tmux_env_args)
+tmux new-session -d -s "$TMUX_SESSION" "${tmux_env[@]}" -c "$WORKTREE" \
     "claude -n $CLAUDE_SESSION ${CLAUDE_EXTRA_FLAGS:-} \"\$(cat $PROMPT_FILE)\""
 
 # 5. 立即翻 label

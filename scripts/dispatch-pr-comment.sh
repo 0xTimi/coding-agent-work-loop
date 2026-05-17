@@ -67,7 +67,8 @@ fi
 # Case B: worktree 还在，session 没了
 if [ -d "$WORKTREE" ]; then
     log "PR #$PR -> 从 worktree 重起 session $TMUX_SESSION"
-    tmux new-session -d -s "$TMUX_SESSION" -c "$WORKTREE" \
+    mapfile -d '' -t tmux_env < <(tmux_env_args)
+    tmux new-session -d -s "$TMUX_SESSION" "${tmux_env[@]}" -c "$WORKTREE" \
         "claude -n $CLAUDE_SESSION ${CLAUDE_EXTRA_FLAGS:-} \"\$(cat $PROMPT_FILE)\""
     flip_label
     exit 0
@@ -91,7 +92,8 @@ done
 [ -n "${WORKTREE_SETUP_CMD:-}" ] && [ "${WORKTREE_SETUP_CMD}" != ":" ] && \
     (cd "$WORKTREE" && eval "$WORKTREE_SETUP_CMD") || true
 
-tmux new-session -d -s "$TMUX_SESSION" -c "$WORKTREE" \
+mapfile -d '' -t tmux_env < <(tmux_env_args)
+tmux new-session -d -s "$TMUX_SESSION" "${tmux_env[@]}" -c "$WORKTREE" \
     "claude -n $CLAUDE_SESSION ${CLAUDE_EXTRA_FLAGS:-} \"\$(cat $PROMPT_FILE)\""
 
 flip_label
