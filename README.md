@@ -61,14 +61,14 @@ GitHub PR 评论流
 ### 一次性：装 skill
 
 ```bash
-git clone https://github.com/<TODO>/github-coding-agent-workflow.git \
+git clone https://github.com/luosky/coding-agent-work-loop.git \
     ~/.claude/skills/coding-agent-workflow
 ```
 
 或如果你 fork 了：
 
 ```bash
-git clone git@github.com:<you>/github-coding-agent-workflow.git \
+git clone git@github.com:<you>/coding-agent-work-loop.git \
     ~/.claude/skills/coding-agent-workflow
 ```
 

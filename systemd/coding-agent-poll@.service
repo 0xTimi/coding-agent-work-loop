@@ -1,6 +1,6 @@
 [Unit]
 Description=coding-agent-workflow poll (instance: %i)
-Documentation=https://github.com/<TODO>/github-coding-agent-workflow
+Documentation=https://github.com/luosky/coding-agent-work-loop
 After=network-online.target
 Wants=network-online.target
 
