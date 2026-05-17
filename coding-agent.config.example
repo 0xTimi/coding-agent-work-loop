@@ -1,0 +1,60 @@
+# coding-agent workflow configuration
+# 复制为 coding-agent.config 并按需修改。所有脚本 + systemd 单元都会 source 这个文件。
+# 必填项已用 ${VAR:?} 在脚本里 fail-fast，不会被 silently 跳过。
+
+# ── GitHub 仓库 ──
+# 必填。格式：owner/repo
+REPO="myorg/myrepo"
+
+# ── 路径 ──
+# 必填。host project 工作树根（git 仓库根目录）
+PROJECT_ROOT="$HOME/github/myproject"
+
+# worktree 存放基础目录（每个 issue 一个子目录）
+WORKTREE_BASE="$HOME/github/worktree/myproject"
+
+# daemon state 目录（state.json + 日志 + 锁）
+STATE_DIR="$HOME/.local/state/coding-agent-poll"
+
+# ── 命名规范 ──
+# tmux session 命名前缀：tmux session = ${TMUX_PREFIX}-issue<N>
+# 例 myproject → tmux session "myproject-issue42"
+TMUX_PREFIX="myproject"
+
+# Branch 命名：${BRANCH_PREFIX}<N>
+# 例 "feature/issue-" → "feature/issue-42"
+BRANCH_PREFIX="feature/issue-"
+
+# Claude Code session 名（CLI -n flag）：${SESSION_NAME_PREFIX}<N>
+# 例 "issue" → claude session shown as "issue42"
+SESSION_NAME_PREFIX="issue"
+
+# ── GitHub label ──
+# 默认 pending/agent + pending/human。改这两个值前确保 label 在仓库已建。
+LABEL_PENDING_AGENT="pending/agent"
+LABEL_PENDING_HUMAN="pending/human"
+
+# ── Worker setup ──
+# worktree 创建后跑的安装/初始化命令（一行；可用 && 串接）
+# 例:
+#   Node:   "npm ci || npm install"
+#   uv:     "uv sync"
+#   Cargo:  "cargo fetch"
+#   none:   ":"
+WORKTREE_SETUP_CMD="npm ci || npm install"
+
+# 在 worktree 里要 cp 进去的「gitignored」文件（空格分隔的相对路径）
+# 典型场景：.env / 任何 commit 不到 git 的本地配置文件
+COPY_TO_WORKTREE=".env"
+
+# ── Claude Code 启动 ──
+# 启动 claude 时的额外 flag。--dangerously-skip-permissions 强烈推荐，否则会卡权限弹窗。
+CLAUDE_EXTRA_FLAGS="--dangerously-skip-permissions"
+
+# ── 并发上限 ──
+# 同一时刻最多多少个 worker session 同时存活。建议 1（串行最稳）。
+MAX_CONCURRENT_WORKERS=1
+
+# ── 轮询间隔 ──
+# Daemon 轮询周期（秒）。systemd timer 用这个值。
+POLL_INTERVAL_SECS=60

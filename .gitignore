@@ -1,0 +1,7 @@
+# Local config / state
+coding-agent.config
+*.local
+.DS_Store
+
+# logs
+*.log

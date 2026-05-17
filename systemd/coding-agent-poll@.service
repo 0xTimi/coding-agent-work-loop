@@ -1,0 +1,19 @@
+[Unit]
+Description=coding-agent-workflow poll (instance: %i)
+Documentation=https://github.com/<TODO>/github-coding-agent-workflow
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# instance name (%i) 是 setup.sh 选定的 project key
+# EnvironmentFile 在 ~/.config/coding-agent-workflow/<key>.conf 注入：
+#   PROJECT_ROOT=...
+#   CODING_AGENT_CONFIG=...
+#   PATH=...
+EnvironmentFile=%h/.config/coding-agent-workflow/%i.conf
+WorkingDirectory=%h/.claude/skills/coding-agent-workflow
+ExecStart=/usr/bin/env bash %h/.claude/skills/coding-agent-workflow/scripts/agent-poll.sh
+
+[Install]
+WantedBy=default.target
