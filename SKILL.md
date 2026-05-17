@@ -41,6 +41,24 @@ description: 用 GitHub label 驱动本机 Claude Code agent 处理 issue/PR，d
    - `gh issue list --repo $REPO --label pending/agent` + `gh pr list --repo $REPO --label pending/agent`
 4. 汇总报告给用户
 
+### cleanup（验收完成后）
+
+用户 merge 了 PR 或决定中止某 issue 的工作，要清理状态。步骤：
+
+1. 确认 issue 已结束（PR merged 或被关闭）
+2. 跑：
+   ```bash
+   bash "$CLAUDE_PLUGIN_ROOT/scripts/cleanup-issue.sh" <issue-number>
+   ```
+   或加 flag：`--force`（worker 还 busy 也清）、`--keep-worktree`（只杀 session）、`--delete-branch`（同时删本地分支）
+
+cleanup-issue.sh 做的事：
+- busy 检查（默认拒绝清理 busy session，除非 --force）
+- 跑项目级 `CLEANUP_HOOK`（在 `coding-agent.config` 配，比如解 tailscale 端口、关 dev server）
+- 杀 worker tmux session
+- 删 worktree（默认）
+- 可选删本地分支
+
 ### disable
 
 用户要停某项目。你的步骤：
