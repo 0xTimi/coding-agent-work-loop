@@ -13,7 +13,12 @@ source "$SCRIPT_DIR/_lib.sh"
 STATE_FILE="$STATE_DIR/state.json"
 LOCK_FILE="$STATE_DIR/poll.lock"
 
-[ -f "$STATE_FILE" ] || echo '{"seen_comments":{}}' > "$STATE_FILE"
+[ -f "$STATE_FILE" ] || echo '{"seen_comments":{},"seen_issue_comments":{}}' > "$STATE_FILE"
+# 老 state.json 缺新字段时补上
+if [ "$(jq -r 'has("seen_issue_comments")' "$STATE_FILE")" != "true" ]; then
+    tmp=$(mktemp)
+    jq '.seen_issue_comments = {}' "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
+fi
 
 # flock 防多个 tick 撞车（万一某次跑慢了 > POLL_INTERVAL_SECS）
 exec 9>"$LOCK_FILE"
@@ -35,12 +40,30 @@ new_issues=$(gh issue list --repo "$REPO" --state open --label "$LABEL_PENDING_A
 
 if [ -n "$new_issues" ]; then
     while IFS=$'\t' read -r num title; do
-        # 已存在 worktree / session → 已派过，跳过
-        if [ -d "$(worktree_path "$num")" ] || tmux has-session -t "$(tmux_session_name "$num")" 2>/dev/null; then
-            log "issue #$num 已有 worktree/session，跳过派工"
+        sess="$(tmux_session_name "$num")"
+        wt="$(worktree_path "$num")"
+
+        # 已有 session → 这是设计阶段已经在跑，用户 comment 后再标 pending/agent；
+        # 走 issue-comment 派工：注入「读最新 comment 决定开干 / 改方案 / 反问」prompt
+        if tmux has-session -t "$sess" 2>/dev/null || [ -d "$wt" ]; then
+            latest_id=$(gh api "repos/$REPO/issues/$num/comments" --jq '.[-1].id // 0' 2>/dev/null || echo 0)
+            last_seen=$(jq -r ".seen_issue_comments[\"$num\"] // 0" "$STATE_FILE")
+            log "issue #$num 已有 worktree/session：latest_id=$latest_id last_seen=$last_seen"
+            if [ "$latest_id" -gt "$last_seen" ]; then
+                log "dispatch issue-comment for #$num"
+                if bash "$SCRIPT_DIR/dispatch-issue-comment.sh" "$num" "$latest_id"; then
+                    tmp=$(mktemp)
+                    jq ".seen_issue_comments[\"$num\"] = $latest_id" "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
+                else
+                    log "issue-comment 派工 #$num 失败（state 不更新，下轮重试）"
+                fi
+            else
+                log "issue #$num: pending/agent 但 issue 无新 comment，跳过（用户需 comment 才能让 agent 再动）"
+            fi
             continue
         fi
-        # 并发守卫
+
+        # 没 worktree / session → 全新 issue 第一次派工（走设计分析阶段）
         if [ "$active_workers" -ge "${MAX_CONCURRENT_WORKERS:-1}" ]; then
             log "已达并发上限，issue #$num 排队等下一轮"
             break
