@@ -1,9 +1,9 @@
 ---
-name: coding-agent-workflow
+name: coding-agent-work-loop
 description: 用 GitHub label 驱动本机 agent 处理 issue/PR，daemon 自动监听并派工。包含 setup（一次部署到某个项目）、status（查 daemon 状态）、disable（关闭某项目的 daemon）等命令
 ---
 
-# coding-agent-workflow
+# coding-agent-work-loop
 
 把 GitHub issue / PR 评论变成你本机 agent 的输入输出。一个 systemd timer + 几个 shell 脚本 + 两个 GitHub label，让你通过 GitHub 网页（或 iOS gh app）直接跟 agent 沟通。
 
@@ -11,7 +11,7 @@ description: 用 GitHub label 驱动本机 agent 处理 issue/PR，daemon 自动
 
 ## 触发方式
 
-用户在调用本 skill 的 agent runtime 里输入 `/coding-agent-workflow <command>` 或自然语言要求时调用。常见请求：
+用户在调用本 skill 的 agent runtime 里输入 `/coding-agent-work-loop <command>` 或自然语言要求时调用。常见请求：
 
 - 「帮我把这个 daemon 装到 X 项目」→ 调 `setup` 流程
 - 「coding agent 现在状态如何」→ 调 `status` 流程
@@ -27,9 +27,9 @@ description: 用 GitHub label 驱动本机 agent 处理 issue/PR，daemon 自动
 2. 检查依赖：`git`、`gh`（已 `gh auth login`）、`tmux`、`jq`、`flock`、`systemctl`，以及 worker CLI（默认是 `claude`）都能 `command -v` 到
 3. 跑：
    ```bash
-   bash "${CLAUDE_PLUGIN_ROOT:-$HOME/.agents/skills/coding-agent-workflow}/setup.sh" <host-project-path>
+   bash "${CLAUDE_PLUGIN_ROOT:-$HOME/.agents/skills/coding-agent-work-loop}/setup.sh" <host-project-path>
    ```
-   `$CLAUDE_PLUGIN_ROOT` 是 Claude Code runtime 注入的 skill 根目录变量；没有时回退到规范的 `~/.agents/skills/coding-agent-workflow`。
+   `$CLAUDE_PLUGIN_ROOT` 是 Claude Code runtime 注入的 skill 根目录变量；没有时回退到规范的 `~/.agents/skills/coding-agent-work-loop`。
 4. setup.sh 跑完后会打印下一步指南，原文转给用户
 
 ### status
@@ -38,7 +38,7 @@ description: 用 GitHub label 驱动本机 agent 处理 issue/PR，daemon 自动
 
 1. `systemctl --user list-timers 'coding-agent-poll@*' --no-pager` — 看 timer 健康
 2. `systemctl --user list-units 'coding-agent-poll@*.service' --no-pager` — 看最近一次执行
-3. 对每个已注册的 `~/.config/coding-agent-workflow/*.conf`：
+3. 对每个已注册的 `~/.config/coding-agent-work-loop/*.conf`：
    - `tail -20 $STATE_DIR/poll.log`（从 conf 读 STATE_DIR）
    - `gh issue list --repo $REPO --label pending/agent` + `gh pr list --repo $REPO --label pending/agent`
 4. 汇总报告给用户
@@ -68,7 +68,7 @@ cleanup-issue.sh 做的事：
 1. 确认 instance 名（`systemctl --user list-timers 'coding-agent-poll@*'`）
 2. `systemctl --user disable --now coding-agent-poll@<key>.timer`
 3. 可选：删除 `~/.config/systemd/user/coding-agent-poll@<key>.{service,timer}` 实例符号链接（如果是真单元文件不动）
-4. 可选：删除 `~/.config/coding-agent-workflow/<key>.conf`
+4. 可选：删除 `~/.config/coding-agent-work-loop/<key>.conf`
 5. 报告
 
 ## 项目内不需要的文件

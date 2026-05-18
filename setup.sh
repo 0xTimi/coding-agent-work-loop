@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# 把 coding-agent-workflow daemon 接入一个 host project。
+# 把 coding-agent-work-loop daemon 接入一个 host project。
 #
 # 关键设计：本 skill **不复制脚本到 host project**。脚本永远住在 skill 目录
-# （`~/.claude/skills/coding-agent-workflow/`，推荐做成指向 `~/github/coding-agent-work-loop/`
+# （`~/.claude/skills/coding-agent-work-loop/`，推荐做成指向 `~/github/coding-agent-work-loop/`
 # 的 symlink）。host project 里只多两样东西：
 #   1. coding-agent.config       —— 本项目专属配置（gitignored）
 #   2. .gitignore 加一行排除上述 config
@@ -46,7 +46,7 @@ if ! [[ "$KEY" =~ ^[A-Za-z0-9_.-]+$ ]]; then
     exit 1
 fi
 
-echo "── coding-agent-workflow setup ──"
+echo "── coding-agent-work-loop setup ──"
 echo "  host project: $HOST"
 echo "  skill dir:    $SKILL_DIR"
 echo "  instance key: $KEY"
@@ -97,14 +97,14 @@ if [ -f "$gitignore" ] && grep -qE "^\s*coding-agent\.config\s*$" "$gitignore"; 
     echo "  · 已在 .gitignore"
 else
     [ -f "$gitignore" ] || touch "$gitignore"
-    printf '\n# coding-agent-workflow per-project config\ncoding-agent.config\n' >> "$gitignore"
+    printf '\n# coding-agent-work-loop per-project config\ncoding-agent.config\n' >> "$gitignore"
     echo "  ✓ 加进 .gitignore"
 fi
 
-# ── 3. 创建 ~/.config/coding-agent-workflow/<key>.conf ──
+# ── 3. 创建 ~/.config/coding-agent-work-loop/<key>.conf ──
 echo
 echo "── 3. 注册 systemd EnvironmentFile ──"
-conf_dir="$HOME/.config/coding-agent-workflow"
+conf_dir="$HOME/.config/coding-agent-work-loop"
 mkdir -p "$conf_dir"
 env_file="$conf_dir/$KEY.conf"
 

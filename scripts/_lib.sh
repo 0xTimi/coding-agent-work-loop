@@ -165,12 +165,14 @@ start_session_logging() {
 }
 
 # Prompt 模板查找顺序：
-#   1. <project>/.agents/skills/coding-agent-workflow/prompts/<name>.template.md   ← 新规范（推荐）
-#   2. <project>/.coding-agent/prompts/<name>.template.md                          ← 旧路径（兼容）
-#   3. <skill-dir>/prompts/<name>.template.md                                      ← skill 默认
+#   1. <project>/.agents/skills/coding-agent-work-loop/prompts/<name>.template.md   ← 新规范（推荐）
+#   2. <project>/.agents/skills/coding-agent-workflow/prompts/<name>.template.md    ← 旧目录名（兼容；老 worktree/分支）
+#   3. <project>/.coding-agent/prompts/<name>.template.md                           ← 更老路径（兼容）
+#   4. <skill-dir>/prompts/<name>.template.md                                       ← skill 默认
 find_prompt_template() {
     local name="$1"   # e.g. "new-issue" / "pr-comment"
     local candidates=(
+        "$PROJECT_ROOT/.agents/skills/coding-agent-work-loop/prompts/${name}.template.md"
         "$PROJECT_ROOT/.agents/skills/coding-agent-workflow/prompts/${name}.template.md"
         "$PROJECT_ROOT/.coding-agent/prompts/${name}.template.md"
         "$SKILL_DIR/prompts/${name}.template.md"
