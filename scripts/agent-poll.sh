@@ -13,12 +13,14 @@ source "$SCRIPT_DIR/_lib.sh"
 STATE_FILE="$STATE_DIR/state.json"
 LOCK_FILE="$STATE_DIR/poll.lock"
 
-[ -f "$STATE_FILE" ] || echo '{"seen_comments":{},"seen_issue_comments":{}}' > "$STATE_FILE"
-# 老 state.json 缺新字段时补上
-if [ "$(jq -r 'has("seen_issue_comments")' "$STATE_FILE")" != "true" ]; then
-    tmp=$(mktemp)
-    jq '.seen_issue_comments = {}' "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
-fi
+[ -f "$STATE_FILE" ] || echo '{"seen_comments":{},"seen_issue_comments":{},"seen_review_comments":{},"seen_reviews":{}}' > "$STATE_FILE"
+# 老 state.json 缺新字段时补上（无破坏迁移；缺字段初始化为 {}）
+for field in seen_issue_comments seen_review_comments seen_reviews; do
+    if [ "$(jq -r "has(\"$field\")" "$STATE_FILE")" != "true" ]; then
+        tmp=$(mktemp)
+        jq ".$field = {}" "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
+    fi
+done
 
 # flock 防多个 tick 撞车（万一某次跑慢了 > POLL_INTERVAL_SECS）
 exec 9>"$LOCK_FILE"
@@ -78,19 +80,33 @@ if [ -n "$new_issues" ]; then
 fi
 
 # ── 2. PR 评论派工 ──
+# PR 上的「评论」其实有三种，存三个不同 endpoint，ID 序列也是独立的：
+#   - /issues/N/comments  ← Conversation tab 的对话评论
+#   - /pulls/N/comments   ← Files Changed 上 inline 的 review comments
+#   - /pulls/N/reviews    ← 整次 review 提交（Approve/Request changes/Comment 的整体 body）
+# 任意一个有新增就派工；state.json 里分三个字段各存最新 ID。
 pending_prs=$(gh pr list --repo "$REPO" --label "$LABEL_PENDING_AGENT" \
     --json number,headRefName --jq '.[] | "\(.number)\t\(.headRefName)"' 2>/dev/null || true)
 
 if [ -n "$pending_prs" ]; then
     while IFS=$'\t' read -r prnum branch; do
-        latest_id=$(gh api "repos/$REPO/issues/$prnum/comments" --jq '.[-1].id // 0' 2>/dev/null || echo 0)
-        last_seen=$(jq -r ".seen_comments[\"$prnum\"] // 0" "$STATE_FILE")
-        log "PR #$prnum: latest=$latest_id last_seen=$last_seen"
-        if [ "$latest_id" -gt "$last_seen" ]; then
+        latest_conv=$(gh api "repos/$REPO/issues/$prnum/comments" --jq '.[-1].id // 0' 2>/dev/null || echo 0)
+        latest_inline=$(gh api "repos/$REPO/pulls/$prnum/comments" --jq '.[-1].id // 0' 2>/dev/null || echo 0)
+        latest_review=$(gh api "repos/$REPO/pulls/$prnum/reviews" --jq '.[-1].id // 0' 2>/dev/null || echo 0)
+        seen_conv=$(jq -r ".seen_comments[\"$prnum\"] // 0" "$STATE_FILE")
+        seen_inline=$(jq -r ".seen_review_comments[\"$prnum\"] // 0" "$STATE_FILE")
+        seen_review=$(jq -r ".seen_reviews[\"$prnum\"] // 0" "$STATE_FILE")
+        log "PR #$prnum: conv=$latest_conv/$seen_conv inline=$latest_inline/$seen_inline review=$latest_review/$seen_review"
+        if [ "$latest_conv" -gt "$seen_conv" ] || \
+           [ "$latest_inline" -gt "$seen_inline" ] || \
+           [ "$latest_review" -gt "$seen_review" ]; then
             log "dispatch PR #$prnum comment"
-            if bash "$SCRIPT_DIR/dispatch-pr-comment.sh" "$prnum" "$branch" "$latest_id"; then
+            # 透传最大的 ID 给 dispatch（仅用于 prompt 文件命名去重，不参与语义）
+            kick_id=$(printf '%s\n%s\n%s\n' "$latest_conv" "$latest_inline" "$latest_review" | sort -rn | head -1)
+            if bash "$SCRIPT_DIR/dispatch-pr-comment.sh" "$prnum" "$branch" "$kick_id"; then
                 tmp=$(mktemp)
-                jq ".seen_comments[\"$prnum\"] = $latest_id" "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
+                jq ".seen_comments[\"$prnum\"] = $latest_conv | .seen_review_comments[\"$prnum\"] = $latest_inline | .seen_reviews[\"$prnum\"] = $latest_review" \
+                    "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
             else
                 log "PR #$prnum 派工失败（state 不更新，下轮重试）"
             fi
