@@ -68,7 +68,7 @@ gh pr diff <P>                             # 最终合入的 diff
 claude --resume <session-id>          # 任何目录都能恢复
 
 # ② 知道对应 PR 号
-claude --from-pr <P>                   # 按 PR 索引恢复
+claude --from-pr <P>                   # 按 PR 索引恢复（见下面"机制"）
 
 # ③ 啥都没记住，靠 picker
 mkdir -p <原 worktree 路径>            # 重建空目录骗 picker
@@ -80,6 +80,12 @@ jq . ~/.claude/projects/<encoded-cwd>/*.jsonl
 ```
 
 > `claude --continue`（`-c`）只看**当前目录最近一次会话**，cleanup 后切目录就用不上；要跨目录恢复必须 `--resume`/`--from-pr`。
+
+**`--from-pr` 是怎么对上 PR 的**：每条 jsonl 消息里有 `cwd`（当时的工作目录）和 `gitBranch`（当时的 git 分支）字段。`--from-pr <P>` 通过 `gh pr view <P>` 拿到 PR 的 head ref（比如 `feature/issue-42`），再到 `~/.claude/projects/` 下扫所有 jsonl，匹配 `gitBranch` = head ref 的会话拉起。所以**前提是 worker 当年用 `git checkout feature/issue-42` 启动 Claude**——本工具的 dispatch 脚本就是这么做的，天然兼容。
+
+> 想自己 100% 锁定恢复目标 → 用 session ID（`claude --resume <uuid>`）。session ID 就是 `~/.claude/projects/<encoded-cwd>/<uuid>.jsonl` 的文件名 uuid。
+>
+> 进一步想让 worker 启动后自动把自己的 session ID 评论到 issue/PR（方便事后 `--resume <uuid>` 一键定位），是个**值得做但超出本 doc 范围的增强**，欢迎开新 issue 跟踪。
 
 ## auto-cleanup 边界
 
