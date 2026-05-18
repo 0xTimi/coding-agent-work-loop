@@ -30,19 +30,19 @@
 
 **便宜**：AI 是本机 `claude` 命令行，吃你 Pro/Max 月费套餐，不烧 API token；空闲的轮询只调 GitHub API，不调模型。
 
-## 不丢档：事后都能翻，断点都能续
+## 按 issue 归类：事后随时找得到，断点随时能续上
 
-每一次跑产出的东西分散在 **GitHub + git + 本机磁盘**，**没有一处会被工具自动抹掉**：
+每个 issue 的产物——设计方案、代码、Claude 对话、tmux 历史——都用 **issue 号**牢牢绑在一起：worktree 是 `issue-N/`、branch 是 `feature/issue-N`、tmux session 是 `<project>-issue<N>`、Claude session 名是 `issue<N>`。半年后想翻当时某次工作，**只要记得 issue 号就能立刻定位**——不像跟 AI 单聊那样，要在几百个无名 session 里翻名字找回当时聊过什么。
 
-| 想找什么 | 在哪 |
+| 想找 #N 的什么 | 去哪（都按 issue 号定位） |
 |---------|-----|
-| 当时的设计方案、讨论、最终结论 | GitHub issue + PR comment thread |
-| 中间 commit、最终 diff | git branch `feature/issue-N` + reflog |
-| Claude 怎么一步步推导的（终端版） | `bash scripts/session-log.sh <N> -c` |
-| Claude 怎么一步步推导的（对话版） | `~/.claude/projects/<encoded-cwd>/*.jsonl` |
-| 想接着续上对话 | 进 worktree `claude --resume`，或 `claude --from-pr <P>` |
+| 当时的设计方案、讨论、最终结论 | GitHub issue #N + 对应 PR comment thread |
+| 中间 commit、最终 diff | `git log feature/issue-N` / `gh pr diff <P>` |
+| Claude 当时怎么一步步推导的（终端版） | `bash scripts/session-log.sh N -c` |
+| Claude 当时的对话内容 | `~/.claude/projects/<...-issue-N>/*.jsonl` |
+| 想接着续上对话 | 进 worktree 跑 `claude --resume`，或 `claude --from-pr <P>` |
 
-PR merge 后默认会 `auto-cleanup` 清掉 worktree + tmux session，但 **git branch、Claude 对话历史、tmux pane log 都不动**——半年后回头看「当时为什么这样做」、想从那个会话接着续，都能。
+PR merge 后默认 `auto-cleanup` 清掉 worktree + tmux session，但 **git branch、Claude 对话、tmux pane log 都按 issue 号留在原处**——半年后想回看「当时为什么这样做」、想从那个会话接着续，都按 issue 号一步到位。
 
 边界、各 SOP 详见 [docs/persistence.md](docs/persistence.md)。
 

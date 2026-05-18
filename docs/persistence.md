@@ -1,6 +1,8 @@
-# 不丢档：事后能翻，断点能续
+# 按 issue 归类：事后随时找得到，断点随时能续上
 
-这套工作流的产物分散在 **GitHub + git + 本机磁盘** 三处，任何一处都不会被工具自动抹掉。机器重启、tmux 误关、PR merge 自动 cleanup —— 都能找回来 / 接着干。
+每个 issue 的产物——设计方案、代码、Claude 对话、tmux 历史——都用 **issue 号**绑在一起：worktree、branch、tmux session、Claude session、pane log 文件名都带 `issue<N>`。**记得 issue 号就能定位到任何一类产物**，不像裸用 AI 时那种「曾经聊过什么」要在一堆 session 里翻名字。
+
+机器重启、tmux 误关、PR merge 自动 cleanup——按 issue 号都能找回 / 接着干。下面分两半：先列每类产物存哪，再给具体 SOP。
 
 ## 资产全清单
 
