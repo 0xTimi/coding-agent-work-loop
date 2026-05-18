@@ -164,6 +164,20 @@ start_session_logging() {
         log "  ⚠️ pipe-pane 失败：$sess → $log_path"
 }
 
+# 跑一条 gh / 任意命令；非 0 时把它的 stderr 拼到 log 里（不退出脚本）。
+# 历史上脚本到处 `gh ... 2>/dev/null || log "失败"`，把真正报错全吞了，
+# 出问题（如 PAT scope 不够）时只能复现一遍才看到原因——非常痛。
+# 用法：run_gh "label 翻转" gh issue edit "$ISSUE" --add-label foo --remove-label bar
+run_gh() {
+    local desc="$1"; shift
+    local out
+    if ! out=$("$@" 2>&1); then
+        log "  ⚠️ ${desc}失败: $out"
+        return 1
+    fi
+    return 0
+}
+
 # 判断一个 cwd（一般是 worktree 路径）下有没有 Claude Code 历史会话。
 # Claude 把每个 project 的 session 存在 ~/.claude/projects/<encoded-cwd>/<uuid>.jsonl
 # 其中 encoded-cwd = 把绝对路径里的 '/' 全替换成 '-'。

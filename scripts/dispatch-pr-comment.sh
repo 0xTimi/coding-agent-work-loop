@@ -18,10 +18,10 @@ ISSUE_N="$(branch_to_issue_num "$BRANCH")"
 if [ -z "$ISSUE_N" ]; then
     log "PR #$PR: branch '$BRANCH' 不符合 BRANCH_PREFIX '$BRANCH_PREFIX'，daemon 无法自动派工"
     log "  → 翻 label 回 $LABEL_PENDING_HUMAN 防反复重试；手动处理或 rename 分支为 ${BRANCH_PREFIX}<N> 后再 label"
-    gh pr edit "$PR" --repo "$REPO" \
+    run_gh "label 翻转 (PR #$PR 兜底 pending/agent → pending/human)" \
+        gh pr edit "$PR" --repo "$REPO" \
         --add-label "$LABEL_PENDING_HUMAN" \
-        --remove-label "$LABEL_PENDING_AGENT" 2>/dev/null || \
-        log "  ⚠️ label 翻转失败（可能 token 权限不够）"
+        --remove-label "$LABEL_PENDING_AGENT" || true
     exit 0
 fi
 
@@ -66,9 +66,10 @@ inject_to_session() {
 
 flip_label() {
     # daemon dispatch 翻到 agent/doing；worker 完工时它自己翻成 pending/human
-    gh pr edit "$PR" --repo "$REPO" \
+    run_gh "label 翻转 (PR #$PR pending/agent → agent/doing)" \
+        gh pr edit "$PR" --repo "$REPO" \
         --add-label "$LABEL_AGENT_DOING" \
-        --remove-label "$LABEL_PENDING_AGENT" 2>/dev/null || true
+        --remove-label "$LABEL_PENDING_AGENT" || true
 }
 
 # Case A: 现有 worker session

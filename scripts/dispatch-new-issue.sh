@@ -56,9 +56,9 @@ tmux new-session -d -s "$TMUX_SESSION" "${tmux_env[@]}" -c "$WORKTREE" \
 start_session_logging "$TMUX_SESSION"
 
 # 5. 立即翻 label 到 agent/doing（worker 完工时它会自己翻成 pending/human）
-gh issue edit "$ISSUE" --repo "$REPO" \
+run_gh "label 翻转 (issue #$ISSUE pending/agent → agent/doing)" \
+    gh issue edit "$ISSUE" --repo "$REPO" \
     --add-label "$LABEL_AGENT_DOING" \
-    --remove-label "$LABEL_PENDING_AGENT" 2>/dev/null || \
-    log "  ⚠️ label 翻转失败"
+    --remove-label "$LABEL_PENDING_AGENT" || true
 
 log "dispatch-new-issue done: #$ISSUE -> $TMUX_SESSION"

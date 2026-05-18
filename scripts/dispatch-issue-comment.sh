@@ -53,9 +53,10 @@ inject_to_session() {
 }
 
 flip_label() {
-    gh issue edit "$ISSUE" --repo "$REPO" \
+    run_gh "label 翻转 (issue #$ISSUE pending/agent → agent/doing)" \
+        gh issue edit "$ISSUE" --repo "$REPO" \
         --add-label "$LABEL_AGENT_DOING" \
-        --remove-label "$LABEL_PENDING_AGENT" 2>/dev/null || true
+        --remove-label "$LABEL_PENDING_AGENT" || true
 }
 
 # Case A: session 还活着 → 注入 prompt
