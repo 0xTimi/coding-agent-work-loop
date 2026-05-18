@@ -32,9 +32,9 @@
 
 ## 按 issue 归类：事后随时找得到，断点随时能续上
 
-每个 issue 的产物——设计方案、代码、Claude 对话、tmux 历史——都用 **issue 号**绑在一起。半年后想接着续 #42 的活：进对应 worktree 跑 `claude --resume` 选会话，立刻接上当时的对话。不像跟 AI 单聊那样要在几百个无名 session 里翻名字。
+每个 issue 的产物——设计方案、代码、Claude 的完整对话（含思考过程和工具调用）、tmux 历史——都用 **issue 号**绑在一起。以后想接着续 #42 的活：进对应 worktree 跑 `claude --resume` 选会话，立刻接上当时的对话。不像跟 AI 单聊那样要在几百个无名 session 里翻名字。
 
-各类产物存哪、断点恢复全 SOP，见 [docs/persistence.md](docs/persistence.md)。
+各类产物存哪、保留多久、断点恢复全 SOP，见 [docs/persistence.md](docs/persistence.md)。
 
 ## 它**不**做什么
 

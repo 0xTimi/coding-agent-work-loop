@@ -1,6 +1,6 @@
 # 按 issue 归类：事后随时找得到，断点随时能续上
 
-每个 issue 的产物——设计方案、代码、Claude 对话、tmux 历史——都用 **issue 号**绑在一起：worktree、branch、tmux session、Claude session、pane log 文件名都带 `issue<N>`。**记得 issue 号就能定位到任何一类产物**，不像裸用 AI 时那种「曾经聊过什么」要在一堆 session 里翻名字。
+每个 issue 的产物——设计方案、代码、Claude 的完整对话（含思考过程和工具调用）、tmux 历史——都用 **issue 号**绑在一起：worktree、branch、tmux session、Claude session、pane log 文件名都带 `issue<N>`。**记得 issue 号就能定位到任何一类产物**，不像裸用 AI 时那种「曾经聊过什么」要在一堆 session 里翻名字。
 
 机器重启、tmux 误关、PR merge 自动 cleanup——按 issue 号都能找回 / 接着干。下面分两半：先列每类产物存哪，再给具体 SOP。
 
@@ -15,10 +15,21 @@
 | Worktree | `$WORKTREE_BASE/issue-N/` | `AUTO_CLEANUP_ON_MERGE=true` 时 daemon 在 PR merge 后删 | 不需要备份（branch 在 remote） |
 | Tmux 活会话 | tmux session `<TMUX_PREFIX>-issue<N>` | `AUTO_CLEANUP_ON_MERGE=true` 时 daemon 在 PR merge 后杀；机器重启自然消失 | 不可备份（运行时状态） |
 | Tmux 历史输出 | `$STATE_DIR/sessions/<TMUX_PREFIX>-issue<N>.log`（append-only） | 没人；同一 issue 重起 session 续写同一份 | 文件即备份 |
-| Claude 对话历史 | `~/.claude/projects/<encoded-cwd>/*.jsonl` | **没人**；`AUTO_CLEANUP_ON_MERGE` 不动这里 | 文件即备份 |
+| Claude 对话历史（含 thinking + tool_use 全程） | `~/.claude/projects/<encoded-cwd>/*.jsonl` | **没人**；`AUTO_CLEANUP_ON_MERGE` 不动这里 | 文件即备份 |
 | 派工去重 / 进度 | `$STATE_DIR/state.json` | 没人；daemon 重启不丢 | 偶尔 cp 一份 |
 
 > `<encoded-cwd>` 是把绝对路径的 `/` 全替换成 `-`。例如 `/home/sky/github/worktree/myproject/issue-42` → `-home-sky-github-worktree-myproject-issue-42`。
+
+## 保留多久
+
+短答：**只要你不删、磁盘还在，就一直在**。本工具 + Claude Code + git 都没有自动 GC 机制——
+
+- **GitHub issue / PR / comment**：GitHub 永久保留，issue 关掉、PR merge 都不会消失
+- **git branch + commit**：本地 + remote 都没自动清理；只有 `git gc` 清的是**没引用**的对象，所以只要 push 上去 / merge 进 main 就稳
+- **`~/.claude/projects/<encoded-cwd>/*.jsonl`**：Claude Code 不自动清理（help 里没有 `--gc/--prune/--retain` 这类 flag、settings.json 也没保留期字段，截至 2026-05）。注意：Anthropic 未来策略可能加，长期归档想稳，自己 `cp -r ~/.claude/projects/` 到备份盘
+- **`$STATE_DIR/sessions/*.log`、`$STATE_DIR/state.json`**：纯本机文件，没人清
+
+**唯一会缩水的**：worktree 里的"中间 commit"如果**既没 push 也没 merge**，超过 90 天会被 `git gc` 当孤儿对象清掉。所以养成 push 习惯就稳。
 
 ## 事后查阅 SOP
 
