@@ -84,6 +84,7 @@ POLL_INTERVAL_SECS=60
 | `${BRANCH}` | branch 全名 |
 | `${ISSUE_N}` | 从 branch 反推的 issue 编号（仅 pr-comment） |
 | `${LABEL_PENDING_AGENT}` / `${LABEL_PENDING_HUMAN}` / `${LABEL_AGENT_DOING}` / `${LABEL_PENDING_PR}` | label 名 |
+| `${OUTPUT_LANGUAGE}` | ISO 639-1 代码，控制 worker 写回 GitHub 的语言（从 `coding-agent.config` 读，默认 `en`） |
 
 ## 文件结构
 
