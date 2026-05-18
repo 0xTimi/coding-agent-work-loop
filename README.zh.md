@@ -53,10 +53,10 @@
 ### 1. 安装（一次性）
 
 ```bash
-npx skills add luosky/coding-agent-work-loop
+npx skills add luosky/coding-agent-work-loop -g
 ```
 
-走 [skills.sh](https://www.skills.sh/docs/faq) ——自动拉取 skill 并注册到你的 AI agent（Claude Code 等）里。再跑同一条命令就是升级。
+走 [skills.sh](https://www.skills.sh/docs/faq)——把 skill 拉到 `~/.agents/skills/coding-agent-work-loop/`，自动探测本机所有 AI CLI（Claude Code / Cursor / Cline / Codex …）并把 skill symlink 进各自目录。再跑同一条命令就是升级。（不加 `-g` 就只装到当前项目目录。）
 
 <details>
 <summary>手动安装（不想用 npx 的话）</summary>

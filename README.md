@@ -53,10 +53,10 @@ Full list of where each artifact lives, retention policy, and SOPs for finding t
 ### 1. Install (once)
 
 ```bash
-npx skills add luosky/coding-agent-work-loop
+npx skills add luosky/coding-agent-work-loop -g
 ```
 
-Powered by [skills.sh](https://www.skills.sh/docs/faq) — fetches this skill and registers it with your AI agent (Claude Code et al.). Run the same command again to upgrade.
+Powered by [skills.sh](https://www.skills.sh/docs/faq) — fetches this skill, lands at `~/.agents/skills/coding-agent-work-loop/`, auto-detects every AI CLI you have installed (Claude Code, Cursor, Cline, Codex, …) and symlinks the skill into each. Run the same command again to upgrade. (Drop `-g` to install into the current project only.)
 
 <details>
 <summary>Manual install (without npx)</summary>
