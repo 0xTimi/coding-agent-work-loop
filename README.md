@@ -2,9 +2,7 @@
 
 > **English** · [中文](README.zh.md)
 
-**Async coding agents driven by GitHub labels — your AI works in parallel while you sleep.**
-
-> Turn "babysitting an AI step-by-step" into "wake up, review the PRs."
+**Work with AI through GitHub issues and PRs — open issues and review PRs like you would with a real teammate; turn "babysitting AI step-by-step" into "wake up, review the PRs."**
 
 ## What it solves
 

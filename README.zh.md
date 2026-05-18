@@ -2,9 +2,7 @@
 
 > [English](README.md) · **中文**
 
-**用 GitHub 标签驱动的异步 coding agent——你睡觉时它在并行写代码。**
-
-> 把「陪 AI 一步步写代码」变成「睡一觉起来批 PR」的工具。
+**用 GitHub issue 和 PR 跟 AI 协作——像对真人同事一样提需求、review PR；把「陪 AI 一步步写代码」变成「睡一觉起来批 PR」。**
 
 ## 它解决什么
 
