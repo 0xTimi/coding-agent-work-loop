@@ -2,9 +2,9 @@
 
 > **English** · [中文](README.zh.md)
 
-> Open issues in bulk, async-review the PRs — like working with a real teammate.
+> Send AI a batch of issues, async-review the PRs it ships — like working with a real teammate.
 >
-> Turn "babysitting AI step-by-step" into "wake up, review the PRs."
+> Turn "babysitting AI step-by-step" into "sleep on it, review the PRs in the morning."
 
 ## What it solves
 
