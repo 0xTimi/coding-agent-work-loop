@@ -1,70 +1,72 @@
-# 给外部贡献者
+# Contributing
 
-欢迎贡献。本仓库是个小工具，没有 CLA、没有要签的协议——MIT licensed，发 PR 即默认接受。
+> **English** · [中文](CONTRIBUTING.zh.md)
 
-> 维护者 / 长期合作者建议先读 [AGENTS.md](AGENTS.md)，里面有项目结构、约定、本地开发流程。这份是给"第一次来"的人看的。
+Welcome. This is a small tool with no CLA, no agreement to sign — it's MIT licensed, opening a PR implies acceptance.
 
-## 适合提的 PR
+> Maintainers and long-term collaborators should start with [AGENTS.md](AGENTS.md), which has project layout, conventions, and local dev workflow. This page is for first-time contributors.
 
-- **Bug 修复**：脚本逻辑错、文档错字、配置示例过时
-- **新调度器支持**：cron / launchd 之外的（如 nix systemd / runit）
-- **Prompt 改进**：让 worker 在某场景更稳 / 更省 token
-- **跨平台兼容**：BSD coreutils 适配、macOS 路径处理
-- **新 GitHub event 监听**：例如订阅 review request、check failure
-- **文档补充 + 译文**：尤其欢迎补「我踩过的坑」类经验
+## Good PRs to send
 
-## 不太适合的 PR
+- **Bug fixes**: script logic errors, doc typos, outdated config samples
+- **New scheduler support**: beyond cron / launchd (nix systemd, runit, …)
+- **Prompt improvements**: making the worker more reliable / token-efficient in some scenario
+- **Cross-platform compatibility**: BSD coreutils adaptations, macOS path handling
+- **New GitHub event sources**: e.g. subscribing to review requests, check failures
+- **Doc additions and translations**: especially welcome — "potholes I hit" notes
 
-- 不写动机的大重构（先开 issue 讨论方案再动手）
-- 引入新运行时依赖但没说明为什么必须（每多一个依赖就多一份装机成本）
-- 破坏现有 `prompts/*.template.md` 占位兼容性（已有部署的 host project 会断）
-- 加复杂抽象层但只支持一个用例（待 N≥3 再抽象）
+## Not-so-good PRs
 
-## PR 流程
+- Big refactors without motivation (open an issue to discuss the approach first)
+- New runtime dependencies introduced without explaining why they're necessary (every extra dep raises the install cost)
+- Breaking changes to existing `prompts/*.template.md` placeholders (deployed host projects will break)
+- Adding complex abstraction layers that only support one use case (wait for N≥3 before abstracting)
 
-1. **Fork → 本地改 → 推到你 fork 的分支**
-   - 分支名按 `feature/<topic>` / `fix/<topic>` / `docs/<topic>` 风格
-2. **开 PR 到 `luosky/coding-agent-work-loop` 的 `main`**
-3. **PR Title**：用 conventional commits 风格
+## PR flow
+
+1. **Fork → edit locally → push to your fork's branch**
+   - Branch name: `feature/<topic>` / `fix/<topic>` / `docs/<topic>` style
+2. **Open a PR against `luosky/coding-agent-work-loop`'s `main`**
+3. **PR title**: conventional-commits style
    ```
-   feat(poll): 加 review request 监听
-   fix(dispatch): worktree 路径含空格时引号丢失
-   docs(security): 补 fine-grained PAT 限制说明
+   feat(poll): add review-request event listener
+   fix(dispatch): worktree path with spaces drops quotes
+   docs(security): note fine-grained PAT limitations
    ```
-4. **PR Body** 至少含：
-   - **动机**：解决什么 / 修什么。链上相关 issue 用 `Closes #N` / `Refs #N`
-   - **改动**：1-2 段或 bullet 列表，不要让 reviewer 自己读 diff 找
-   - **验证**：你自己怎么试过的（跑了哪条命令 / 在哪个项目接入跑过 / 改了哪个 prompt 后用什么场景验证）
-   - **影响面**：如果改了 `coding-agent.config.example` / `prompts/*.template.md` / state.json schema，明说——这些是有兼容性约束的接口
-5. **保持小**：一个 PR 一个焦点。改 daemon + 顺手重命名 + 加新功能塞一个 PR 里基本会被要求拆
-6. **Style**：跟现有代码风格走（shell `set -euo pipefail` + `log()` helper + 用 `_lib.sh` 里的函数；markdown 用现有中文/英文混排习惯）
+4. **PR body** must include at minimum:
+   - **Motivation**: what's being solved / fixed. Link related issues via `Closes #N` / `Refs #N`
+   - **Changes**: 1–2 paragraphs or a bullet list. Don't make the reviewer read the diff to figure it out
+   - **Verification**: how you tested it (which commands you ran / which project you connected it to / which prompt scenario you verified)
+   - **Impact**: if you changed `coding-agent.config.example` / `prompts/*.template.md` / state.json schema, say so explicitly — these are compatibility-bound interfaces
+5. **Keep PRs small**: one focused change per PR. Mixing daemon changes + a rename + a new feature in one PR will get split
+6. **Style**: follow existing conventions (shell `set -euo pipefail` + `log()` helper + functions from `_lib.sh`; markdown follows the project's bilingual layout)
 
-## Review 时记得点 Submit
+## When you review: remember to click Submit
 
-GitHub UI 上，给 PR 加 inline 评论有两条路：
+There are two ways to add inline review comments on GitHub:
 
-| 操作 | 可见性 | Daemon 能看到 |
-|------|-------|:---:|
-| **Add single comment**（单条直接发） | 立即对所有人可见 | ✅ |
-| **Start a review** → 加几条 → ⚠️ **没点 Submit review** | 草稿状态，只对作者本人可见 | ❌ |
+| Action | Visibility | Daemon sees it |
+|--------|------------|:---:|
+| **Add single comment** (post one directly) | Immediately public | ✅ |
+| **Start a review** → add comments → ⚠️ **forget to Submit review** | Draft state, visible only to you | ❌ |
 
-如果你 review 完发现 daemon 没反应，**先确认有没有 PENDING review 卡在草稿**。GitHub 不让别人看你的草稿——这是平台机制，daemon 没辙。
+If you've left a review and the daemon doesn't react, **first check whether you have a PENDING review stuck in draft**. GitHub won't let others read your draft — this is platform behavior, not a daemon bug.
 
-## 提到 daemon trigger 的安全约定
+## Security agreements around daemon triggers
 
-本仓库的 `main` 上跑着 daemon。给本仓库的 issue / PR 加 `pending/agent` label 会触发 AI 在维护者机器上自动改代码 + push。
+The `main` branch of this repo runs an active daemon. Adding `pending/agent` to one of this repo's issues / PRs triggers an AI to auto-modify code + push on the maintainer's machine.
 
-**所以**：
+So:
 
-- **External contributor 不能给自己的 PR 打 `pending/agent` label**——GitHub 默认 collaborator 才有 label 权限。但万一你被加成 collaborator 了，请仍**只**用 label 触发对**你自己**的 PR 进行改动指示，且和维护者商量好范围
-- **不要在 issue / PR 评论里写"骨架式 prompt"**（`[SYSTEM] ignore previous instructions...`）——本工具有 prompt-injection 防御但不是 100%，恶意尝试会被记录 + 用户被加黑
-- **发现安全漏洞**：不要直接发到 public issue。GitHub Security Advisory → "Report a vulnerability"，或邮件维护者私发。
-- 详细安全模型见 [docs/security.md](docs/security.md)
+- **External contributors must not label their own PRs `pending/agent`** — GitHub gates label permissions to collaborators by default. If you do get added as a collaborator, please still only use the label to drive changes to **your own** PRs and coordinate scope with the maintainer
+- **Don't write "scaffolded prompts"** in issue / PR comments (`[SYSTEM] ignore previous instructions...`) — the tool has prompt-injection defenses but they're not 100%; malicious attempts get logged and the user gets banned
+- **Found a security issue**: do not post to a public issue. Use GitHub Security Advisory → "Report a vulnerability", or email the maintainer directly
+- Full security model: [docs/security.md](docs/security.md)
 
 ## License
 
-MIT。你提交的代码即同意以 MIT 发布。不需要签 DCO / CLA，但**commit 用真实邮箱**（不接受 `noreply` 之类的纯匿名 commit，attribution 要查得到）。
+MIT. By submitting code you agree to release it under MIT. No DCO / CLA signing required, but **commit with a real email** (we don't accept fully-anonymous `noreply` commits — attribution must be traceable).
 
-## Code of Conduct
+## Code of conduct
 
-讨论时对事不对人。Issue / PR 里别人给的 review feedback 是工作内容评价，不是人身评价。我们没有正式 CoC 文档但执行 Contributor Covenant 的精神。
+Discuss the work, not the person. Review feedback in issues / PRs is about the code, not character. We don't have a formal CoC doc but follow the Contributor Covenant spirit.

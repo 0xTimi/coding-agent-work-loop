@@ -1,52 +1,54 @@
 # coding-agent-work-loop
 
-> 把「陪 AI 一步步写代码」变成「睡一觉起来批 PR」的工具。
+> **English** · [中文](README.zh.md)
 
-## 它解决什么
+> Turn "babysitting an AI step-by-step" into "wake up, review the PRs."
 
-平时跟 AI 写代码是**串行**的：发 prompt → 等回复 → 看 → 反馈 → 等 → 看……一步都不能走开，一晚上做不完几个需求。
+## What it solves
 
-这个工具把循环挪到 GitHub，让你**并行**：
+Working with AI on code is normally **serial**: write a prompt → wait → read → respond → wait → read… You can't walk away, and a single evening barely gets a few requests done.
+
+This tool moves the loop into GitHub, making it **parallel**:
 
 ```
-睡前：批量开 10 个 issue，每个打 pending/agent 标签，关电脑去睡。
-睡醒：GitHub 上躺着 10 个 PR / 设计提案，你像 reviewer 一样挨个看，
-     OK 就 merge，想改就在 PR 评论里写反馈 + 重新打标签，
-     AI 自己再下一轮（你这边不用动）。
+Before bed: open 10 issues, label each pending/agent, close laptop, sleep.
+Morning:    10 PRs / design proposals sit on GitHub. Review them like a reviewer,
+            merge what's good, comment + re-label what needs changes,
+            AI does another round on its own (you stay hands-off).
 ```
 
-你的角色从「陪 AI 对话的人」变成「批阅 AI 提的 PR 的人」。N 个需求并行跑，互不阻塞，进度看 GitHub 标签一眼清楚。手机上的 gh app 一样能 review + 评论 + 打标签，通勤路上也能推进。
+You shift from "the person chatting with the AI" to "the person reviewing the AI's PRs." N requests run in parallel, never blocking each other, and progress is visible at a glance via GitHub labels. The mobile gh app handles review + comment + label too, so you can keep things moving during the commute.
 
-## 工作机制
+## How it works
 
-本机有个**后台轮询**，每 60 秒看一眼 GitHub：发现哪个 issue / PR 被你打了 `pending/agent` 标签，就在你本地启动 Claude Code，让它在一个**独立工作目录**里干活——读评论、写代码、跑测试、提交、推送、回评论，最后把标签翻回 `pending/human` 等你来看。所有沟通都在 GitHub 评论里留痕。
+A **background poller** on your machine looks at GitHub every 60 seconds. When it sees an issue or PR labeled `pending/agent`, it spins up Claude Code locally in an **isolated working directory** to do the work — read comments, write code, run tests, commit, push, reply — then flips the label back to `pending/human` for your review. Everything stays as a paper trail in GitHub comments.
 
-两种触发场景：
+Two trigger scenarios:
 
-| 场景 | 触发 | AI 做的事 |
-|------|------|---------|
-| 新需求 | 给 issue 加 `pending/agent` | 先写一份**设计提案**当评论跟你确认（怎么做、要不要拆 PR），确认后建分支 → 实现 → 开 PR |
-| Review 反馈 | 给 PR 加 `pending/agent`（带评论） | 找到正在干这个 PR 的 AI 会话，读最新评论后改代码 / 答疑 |
+| Scenario | Trigger | What the AI does |
+|----------|---------|------------------|
+| New request | Add `pending/agent` to an issue | Posts a **design proposal** comment first (asking how to approach it, whether to split PRs), then on your confirmation: branch → implement → open PR |
+| Review feedback | Add `pending/agent` to a PR (with a comment) | Finds the AI session for this PR, reads the latest comment, and acts |
 
-**便宜**：AI 是本机 `claude` 命令行，吃你 Pro/Max 月费套餐，不烧 API token；空闲的轮询只调 GitHub API，不调模型。
+**Cheap**: the AI is your local `claude` CLI, billed under your Pro/Max subscription — no API tokens burned. The 60s polling only hits the GitHub API, not the model.
 
-## 按 issue 归类：事后随时找得到，断点随时能续上
+## Filed by issue number: always findable, always resumable
 
-每个 issue 的产物——设计方案、代码、Claude 的完整对话（含思考过程和工具调用）、tmux 历史——都用 **issue 号**绑在一起。以后想接着续 #42 的活：进对应 worktree 跑 `claude --resume` 选会话，立刻接上当时的对话。不像跟 AI 单聊那样要在几百个无名 session 里翻名字。
+Every artifact from an issue's run — the design proposal, the code, Claude's full conversation (thinking and tool calls included), tmux history — is tied to the **issue number**. Resuming #42 later: `cd` into the matching worktree and `claude --resume` to pick the session — you're instantly back in that conversation. Unlike a bare AI chat where you have to scrub through hundreds of nameless sessions to find "that one from before."
 
-各类产物存哪、保留多久、断点恢复全 SOP，见 [docs/persistence.md](docs/persistence.md)。
+Full list of where each artifact lives, retention policy, and SOPs for finding things / resuming work: see [docs/persistence.md](docs/persistence.md).
 
-## 它**不**做什么
+## What it **doesn't** do
 
-- ❌ **不是云端服务**：跑在你自己的电脑 / NAS。机器关机就停
-- ❌ **不替代代码 review**：AI 会改代码 + 自动推送，review 仍是你的事。建议主分支保护 + required reviewer
-- ❌ **不自动 merge**：merge / 关 PR 永远是你手动操作
+- ❌ **Not a cloud service**: runs on your laptop / NAS. Machine off = it stops
+- ❌ **Doesn't replace code review**: the AI changes code and auto-pushes, review is still your job. Protect main + require reviewers
+- ❌ **Doesn't auto-merge**: merging / closing PRs is always your call
 
 ---
 
-## 快速开始
+## Quick start
 
-### 1. 安装（一次性）
+### 1. Install (once)
 
 ```bash
 git clone https://github.com/luosky/coding-agent-work-loop.git ~/github/coding-agent-work-loop
@@ -55,76 +57,76 @@ ln -s ~/github/coding-agent-work-loop ~/.agents/skills/coding-agent-work-loop
 ln -s ~/.agents/skills/coding-agent-work-loop ~/.claude/skills/coding-agent-work-loop
 ```
 
-把代码放 `~/github/`，再做两个软链让 Claude Code 能找到它。以后 `git pull` 就是升级。
+Code lives in `~/github/`; two symlinks let Claude Code find it. Future `git pull` is the upgrade path.
 
-### 2. 接入一个项目
+### 2. Connect a project
 
 ```bash
 bash ~/.agents/skills/coding-agent-work-loop/setup.sh ~/path/to/your-project
 ```
 
-或者直接在 Claude Code 里说「帮我把 coding-agent-work-loop 装到 ~/path/to/your-project」，AI 会自己跑。
+Or just say "install coding-agent-work-loop on ~/path/to/your-project" inside Claude Code — the AI will run it.
 
-一条命令搞定：建项目专属配置、登记后台轮询、在 GitHub 仓库建好 `pending/agent` / `pending/human` 等标签、启动定时任务。无破坏性、可重复跑。
+One command handles: per-project config, registering the background poller, creating `pending/agent` / `pending/human` etc. labels in the repo, starting the timer. Non-destructive, idempotent.
 
-### 3. 关机也要继续跑（可选）
+### 3. Keep running while logged out (optional)
 
 ```bash
 sudo loginctl enable-linger $USER
 ```
 
-Linux 默认你登出就停所有后台服务，这条让它在你不在的时候也跑。
+Linux stops user services on logout by default; this keeps the poller alive when you're away.
 
-## 依赖
+## Dependencies
 
-`git`、`gh`（先 `gh auth login`）、`tmux`、`jq`、`flock`、`claude`（Pro/Max 计划）。Linux 用自带的 `systemd` 跑后台轮询；macOS 用 `launchd`（见 [operations.md](docs/operations.md#其他调度器)）。测过 Ubuntu 22.04 / 24.04。
+`git`, `gh` (run `gh auth login` first), `tmux`, `jq`, `flock`, `claude` (Pro/Max plan). Linux uses the built-in `systemd` to schedule the poller; macOS uses `launchd` (see [docs/operations.md](docs/operations.md#alternative-schedulers)). Tested on Ubuntu 22.04 / 24.04.
 
 ---
 
-## 用法
+## Usage
 
-### 场景 1：新需求
+### Scenario 1: New request
 
 ```bash
-gh issue create --title "..." --body "..."     # 假设拿到 #42
+gh issue create --title "..." --body "..."     # say you get #42
 gh issue edit 42 --add-label pending/agent
 ```
 
-60 秒内后台接活：建独立工作目录、起 Claude Code、写完开 PR（body 里 `Closes #42` 或 `Refs #42`），标签翻 `pending/human` 等你 review。想看 AI 在干啥：`tmux attach -t <project>-issue42`。
+Within 60s the poller picks it up: builds an isolated working dir, starts Claude Code, writes code, opens a PR (with `Closes #42` or `Refs #42` in the body), flips the label to `pending/human` for your review. Watch what the AI does: `tmux attach -t <project>-issue42`.
 
-### 场景 2：PR Review 反馈
+### Scenario 2: PR review feedback
 
 ```bash
-gh pr comment N --body "把 foo 改成 bar"
+gh pr comment N --body "rename foo to bar"
 gh pr edit N --add-label pending/agent --remove-label pending/human
 ```
 
-60 秒内后台找到对应的 AI 会话，把你的评论喂进去 → 改代码 → 测试 → 推送 → 回评论 → 翻标签。
+Within 60s the poller finds the AI session for this PR, feeds in your comment → AI edits → tests → push → reply → flip label.
 
-### 场景 3：澄清问题
+### Scenario 3: Clarification question
 
 ```bash
-gh pr comment N --body "这里为什么不用 X 模式？"
+gh pr comment N --body "why not pattern X here?"
 gh pr edit N --add-label pending/agent --remove-label pending/human
 ```
 
-AI 看是讨论性问题，只回评论不动代码，标签保持 `pending/human` 等你下一句。
+AI sees it's a discussion question, replies without touching code, keeps label `pending/human` waiting for your next turn.
 
 ---
 
-## 深入阅读
+## Read more
 
-| 文档 | 内容 |
-|------|------|
-| [docs/architecture.md](docs/architecture.md) | 标签状态机的五种状态、PR↔Issue 闭环关系（A/B/C）、为什么这么设计 |
-| [docs/persistence.md](docs/persistence.md) | 设计方案 / 讨论 / 代码 / Claude 对话 / tmux 历史 都存哪、怎么事后查阅、怎么从断点续上 |
-| [docs/security.md](docs/security.md) | **公开仓库务必读**。匿名评论可能塞 prompt injection（用提示词劫持 AI），怎么防 |
-| [docs/operations.md](docs/operations.md) | 配置全字段、prompt 模板、多项目共存、升级、macOS launchd、即时触发 webhook、换其他 AI 工具、故障排查 |
+| Doc | About |
+|-----|-------|
+| [docs/architecture.md](docs/architecture.md) | Five-state label machine, PR↔Issue closure relationship (A/B/C), why the design works this way |
+| [docs/persistence.md](docs/persistence.md) | Where design proposals / discussions / code / Claude conversations / tmux history live, how to look them up later, how to resume from a break point |
+| [docs/security.md](docs/security.md) | **Public-repo users must read.** Anonymous comments can contain prompt injection; how the defenses work |
+| [docs/operations.md](docs/operations.md) | Full config, prompt templates, multi-project, upgrades, macOS launchd, webhook trigger, swapping AI worker, troubleshooting |
 
-## 备注
+## Note
 
-本项目是个 **Agent Skill**——给 Claude Code 这类 AI 编程工具加载的功能包。但你不用 Claude Code 也能跑：后台脚本是纯 shell + `gh` 命令，cron / systemd / launchd 都能调度，把 Claude 换成 Aider / Cursor CLI 等也行（见 [operations.md → 自定义 worker](docs/operations.md#自定义-worker不是-claude-code)）。
+This is an **Agent Skill** — a feature package loaded by AI coding tools like Claude Code. But you don't need Claude Code to run it: the background scripts are plain shell + `gh` CLI, scheduled by cron / systemd / launchd, and you can swap Claude out for Aider / Cursor CLI / others (see [docs/operations.md → custom worker](docs/operations.md#custom-worker-not-claude-code)).
 
 ## License
 
-MIT。见 [LICENSE](LICENSE)。
+MIT. See [LICENSE](LICENSE).

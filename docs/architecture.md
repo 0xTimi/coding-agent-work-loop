@@ -1,100 +1,102 @@
-# 设计原理
+# Design
 
-## Label 状态机（五态）
+> **English** · [中文](architecture.zh.md)
 
-| Label | 谁标 | 含义 |
-|------|------|------|
-| `pending/agent` | 你 | 等 agent pick up（issue 待派工 / PR 有 review 反馈待修） |
-| `agent/doing` | daemon | agent 正在 dispatching / worker tmux 正在处理 |
-| `pending/human` | worker / daemon | 等你 review / merge / 决策 |
-| `pending/PR` | worker（开 PR 时） | issue 工作已转 PR 跟踪；去看 PR |
-| `Done` | daemon（auto-cleanup） | **只标 PR**（PR merged = 真闭环）；**不标 issue**（issue 是长期 tracker，关闭权交给你） |
+## Label state machine (five states)
 
-### 关于 PR↔Issue 闭环关系：worker 在设计阶段就决定
+| Label | Set by | Meaning |
+|-------|--------|---------|
+| `pending/agent` | You | Wait for the agent to pick it up (issue waiting for dispatch / PR has review feedback to address) |
+| `agent/doing`   | Daemon | Daemon is dispatching / worker tmux is running |
+| `pending/human` | Worker / daemon | Wait for you to review / merge / decide |
+| `pending/PR`    | Worker (when opening a PR) | Issue work moved to the PR for tracking; go look at the PR |
+| `Done`          | Daemon (auto-cleanup) | **Only on the PR** (PR merged = truly closed); **not on the issue** (the issue is a long-term tracker; closing it is your call) |
 
-| 场景 | PR body 用 | merge 时 issue 状态 | daemon auto-cleanup |
-|------|-------|------|------|
-| **A. 完整闭环**：一个 PR 全解决 issue | `Closes #N` | GitHub 自动关 | issue 加 Done（与 PR 同状态） |
-| **B. 部分实现**：多 PR 才完成 issue | `Refs #N` | 保持 open | issue 翻 `pending/human` 等你 triage |
-| **C. issue 太大**：建议拆 sub-issue | 不直接派工 | — | 你拆完每个 sub-issue 再单独 label |
+### PR↔Issue closure: decided at design time
 
-worker 在「设计提案」comment 里就会列出选 A/B/C 的判断，跟你讨论确认后才开干。所以 `Closes` 还是 `Refs` 是**设计阶段共识**，不是 worker 默认行为。
+| Scenario | PR body uses | Issue state at merge | Daemon auto-cleanup |
+|----------|--------------|----------------------|---------------------|
+| **A. Full closure**: one PR fully resolves the issue | `Closes #N` | GitHub auto-closes | Issue gets `Done` (in sync with the PR) |
+| **B. Partial implementation**: multiple PRs are needed | `Refs #N` | Stays open | Issue flipped to `pending/human` for you to triage |
+| **C. Issue too large**: suggest splitting into sub-issues | Not dispatched directly | — | You break it down, then label each sub-issue separately |
 
-### 状态流转图
+In its "design proposal" comment, the worker explicitly justifies its A/B/C pick and asks you to confirm before coding. So `Closes` vs `Refs` is a **design-time consensus**, not the worker's default.
+
+### State flow
 
 ```
-新 issue ──────────────────► label: pending/human（默认，等你 triage）
+New issue ──────────────────► label: pending/human (default, waiting for you to triage)
    │
-   │ 你加 label: pending/agent
+   │ You add label: pending/agent
    ▼
-pending/agent ──► daemon dispatch ──► label: agent/doing  ← GitHub UI 实时可见
+pending/agent ──► daemon dispatch ──► label: agent/doing   ← visible in GitHub UI live
                                               │
-                                              │ worker 干活（建分支、写代码、跑测试、push、开 PR with `Refs #N`）
+                                              │ worker does work (branch / write code / run tests / push / open PR with `Refs #N`)
                                               ▼
-                                       worker 完工 →
+                                       worker done →
                                           - PR  : pending/human
-                                          - Issue: pending/PR （工作已转 PR 跟踪）
+                                          - Issue: pending/PR (work transferred to PR for tracking)
                                               │
                                               ▼
-                                       PR(pending/human) → 你 review
+                                       PR(pending/human) → you review
                                               │
-                                              ▼ (你 merge PR)
+                                              ▼ (you merge the PR)
                                        daemon auto-cleanup →
-                                          - PR  : Done（PR 闭环）
-                                          - Issue: pending/human（issue 仍 open，**等你 triage** 这次 PR 是否真把问题彻底搞定）
+                                          - PR  : Done (PR closure)
+                                          - Issue: pending/human (issue still open, **you decide** whether this PR truly resolves it)
                                               │
                                               ▼
-                                       你决定：
-                                          - 真闭环 → 手动关 issue（可加 Done label）
-                                          - 还差点 → 评论 + 标 pending/agent，进新一轮设计或开发
+                                       You decide:
+                                          - Fully resolved → manually close the issue (optionally add Done label)
+                                          - Still partial → comment + label pending/agent for a fresh design / dev cycle
 ```
 
-## 重入与并发安全
+## Re-entry and concurrency safety
 
-- **flock**：`agent-poll.sh` 用 `$STATE_DIR/poll.lock` 防多个 systemd tick 撞车
-- **派工立刻翻 label**：daemon 发现 `pending/agent` → dispatch → **第一件事翻成 `agent/doing`**。下一 tick daemon 看到的是 `agent/doing`，不在 `pending/agent` 扫描范围内，不会重复触发
-- **agent/doing 也是 UI 信号**：你在 GitHub 上一眼能区分「agent 在干」（agent/doing）和「agent 干完等你」（pending/human），无需 attach tmux 才能知道
-- **state.json**：记录每个 PR「上次见过的最大 comment ID」。同一条评论永远不会被两次派工
-- **active worker 计数**：通过 tmux session 命名约定数活的 worker；超过 `MAX_CONCURRENT_WORKERS` 时新任务排队等下一轮
+- **flock**: `agent-poll.sh` uses `$STATE_DIR/poll.lock` to prevent simultaneous systemd ticks from colliding
+- **Label flip is immediate on dispatch**: daemon sees `pending/agent` → dispatches → **first thing it does is flip to `agent/doing`**. Next tick the daemon sees `agent/doing`, which isn't in the `pending/agent` scan set, so no re-dispatch
+- **`agent/doing` is also a UI signal**: at a glance on GitHub you can tell "agent is working" (agent/doing) from "agent finished, waiting on you" (pending/human) — no need to attach tmux to know
+- **state.json**: records the highest comment ID seen per PR, so the same comment is never dispatched twice
+- **Active worker counting**: counts live workers via the tmux session naming convention; new tasks queue up when `MAX_CONCURRENT_WORKERS` is reached
 
-## Worker 会话模型
+## Worker session model
 
-- 每个 issue → 一个 git worktree → 一个 tmux session → 一个 `claude -n issue<N> --dangerously-skip-permissions` 进程
-- 命名：tmux session = `<TMUX_PREFIX>-issue<N>`、worktree = `<WORKTREE_BASE>/issue-<N>`、branch = `<BRANCH_PREFIX><N>`
-- PR 评论触发：找对应 session 用 `tmux load-buffer + paste-buffer -p`（bracketed paste）把 prompt 多行注入，再 `send-keys Enter` 提交
-- **自动 resume**：worker session 死了（`/quit` / 重启 / crash）后又被触发，调度脚本会查 `~/.claude/projects/<encoded-worktree>/` 有没有历史 jsonl——有就 `claude --continue` 续上原对话（保留所有上下文 + 工具调用历史），没有就 `claude -n issue<N>` 全新起。这意味着用户中途 `/quit` 不丢进度。
-- Session 没了（worktree 也被清掉）→ 自动从 PR head branch 重建 worktree + spawn 新 session（同样按上面规则尝试 resume）
-- **Pane 日志持久化**：每个 worker session 起来后，dispatch 脚本立刻挂 `tmux pipe-pane` 把输出 append 到 `$SESSION_LOG_DIR/<tmux-session>.log`（默认 `$STATE_DIR/sessions/`）。tmux session 退出后该文件仍在，可以 `cat` / `less` 回看
+- Each issue → one git worktree → one tmux session → one `claude -n issue<N> --dangerously-skip-permissions` process
+- Naming: tmux session = `<TMUX_PREFIX>-issue<N>`, worktree = `<WORKTREE_BASE>/issue-<N>`, branch = `<BRANCH_PREFIX><N>`
+- PR comment trigger: find the corresponding session, use `tmux load-buffer + paste-buffer -p` (bracketed paste) to inject the multi-line prompt, then `send-keys Enter` to submit
+- **Auto-resume**: if the worker session dies (`/quit` / restart / crash) and another trigger comes in, the dispatch script checks `~/.claude/projects/<encoded-worktree>/` for existing jsonl files — if found, runs `claude --continue` to resume the original conversation (all context + tool history preserved); otherwise `claude -n issue<N>` for a fresh start. User-initiated `/quit` in the middle of work doesn't lose progress.
+- Session gone (and worktree also cleaned up) → automatically rebuilds the worktree from PR head branch + spawns a new session (applies the same resume logic above)
+- **Pane log persistence**: each worker session opens with a `tmux pipe-pane` that appends pane output to `$SESSION_LOG_DIR/<tmux-session>.log` (default `$STATE_DIR/sessions/`). The file lives on after the tmux session exits — `cat` / `less` to review
 
-> 全资产存哪 / 怎么事后查阅 / 怎么断点续写，见 [persistence.md](persistence.md)。
+> Where every artifact lives, how to look things up after the fact, and how to resume from a break point: see [persistence.md](persistence.md).
 
-## 设计选择 FAQ
+## Design choice FAQ
 
-### 为什么用 git worktree
+### Why git worktree
 
-- 主 working tree 不被打扰，你可以并行干自己的事
-- 每个 issue 一个独立目录，依赖独立装，互不污染
-- 删 worktree 不影响 git history
+- Main working tree stays untouched, you can keep working on your own things in parallel
+- Each issue gets its own directory, dependencies installed independently, no cross-contamination
+- Removing a worktree doesn't affect git history
 
-### 为什么用 tmux
+### Why tmux
 
-- Claude Code 是 TUI 应用，需要伪终端
-- session 可以 attach 回去看进度 / 接管
-- session 死了不影响 worker 进程（但 Claude 是前台进程，tmux 死了它也死，所以靠 tmux 保命）
+- Claude Code is a TUI app, needs a pseudo-terminal
+- Sessions can be reattached for you to watch progress / take over
+- A dying session doesn't kill the worker process (well — Claude is a foreground process, so tmux dying does kill it; tmux is what keeps it alive)
 
-### 为什么用 `paste-buffer -p`（bracketed paste）
+### Why `paste-buffer -p` (bracketed paste)
 
-直接 `send-keys` 多行字符串会把 `\n` 当成 Enter 提交多次。`paste-buffer -p` 用终端的 bracketed paste 协议把整段当成一个粘贴块，Claude Code（基于 Ink/React-TUI）会作为单条用户消息处理。
+A direct `send-keys` of a multi-line string would interpret each `\n` as Enter, submitting one message per line. `paste-buffer -p` uses the terminal's bracketed-paste protocol so the whole block is a single paste, which Claude Code (Ink/React-TUI) processes as one user message.
 
-### 为什么 systemd 用 `@` 模板
+### Why systemd `@` template units
 
-一份模板 unit 支持多 project 实例，避免每个项目装一份。`%i` = instance key，`EnvironmentFile=%h/.config/coding-agent-work-loop/%i.conf` 让每个实例读自己的环境。
+A single template service supports multiple project instances, so we don't install one per project. `%i` = instance key; `EnvironmentFile=%h/.config/coding-agent-work-loop/%i.conf` lets each instance read its own env.
 
-### 为什么不直接用 Claude Code 的 `--from-pr`
+### Why not just use Claude Code's `--from-pr`
 
-Claude Code CLI 有 `--from-pr` flag 但依赖 Anthropic 官方 GitHub App / Action 流。本项目走「label + 本机 daemon」就是为了**避免依赖**官方 App，让你用自己机器的环境 + Max 计划，不需要 API key。
+Claude Code CLI has a `--from-pr` flag, but it depends on Anthropic's official GitHub App / Action flow. This project's "label + local daemon" approach exists specifically to **avoid that dependency**, so you can use your own machine + Max plan, no API key required.
 
-### 为什么这套架构便宜（对比 webhook + Claude API 方案）
+### Why this stack is cheap (vs webhook + Claude API)
 
-1. **轮询循环不烧 token**：每 60 秒跑一次的 `agent-poll.sh` 是纯 shell + `gh` API 调用，**不调模型**。空闲时 0 token 消耗。只有真的发现 `pending/agent` 的 issue/PR 评论时，才 dispatch 到 Claude Code 进程。
-2. **dispatch 走 Claude Code CLI，吃 Max 月费套餐**：worker 是本机 `claude` CLI 进程，计费按你的 Pro/Max 订阅算，不需要 API key、不按 token 计价。相比传统 webhook + Anthropic API 的方案（每次触发都按 token 收钱），长期跑下来便宜一大截。
+1. **The polling loop burns zero tokens**: `agent-poll.sh` running every 60 seconds is plain shell + `gh` API calls — **no model calls**. Idle = 0 token consumption. Only when it actually finds a `pending/agent` issue / PR does it dispatch to a Claude Code process.
+2. **Dispatch goes through the Claude Code CLI, which is on your Max subscription**: workers are local `claude` CLI processes, billed under your Pro/Max plan; no API key, no per-token pricing. Versus the traditional webhook + Anthropic API approach (every trigger costs tokens), this is much cheaper long-term.
