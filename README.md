@@ -184,9 +184,11 @@ sudo loginctl enable-linger $USER
 |------|------|------|
 | `pending/agent` | 你 | 等 agent pick up（issue 待派工 / PR 有 review 反馈待修） |
 | `agent/doing` | daemon | agent 正在 dispatching / worker tmux 正在处理 |
-| `pending/human` | worker | issue/PR 等你 review / merge / 决策 |
+| `pending/human` | worker / daemon | 等你 review / merge / 决策 |
 | `pending/PR` | worker（开 PR 时） | issue 工作已转 PR 跟踪；去看 PR |
-| `Done` | daemon（auto-cleanup） | PR merged + cleanup 完成；issue/PR 真彻底结案 |
+| `Done` | daemon（auto-cleanup） | **只标 PR**（PR merged = 真闭环）；**不标 issue**（issue 是长期 tracker，关闭权交给你） |
+
+**约定：worker 开 PR 时 body 用 `Refs #N` 而不是 `Closes #N`**——避免 PR merge 时 GitHub 自动关 issue。issue 是问题的长期 tracker；何时关由你判断（这次 PR 是否真闭环了那个问题？还是只是一次部分尝试？）。
 
 ```
 新 issue ──────────────────► label: pending/human（默认，等你 triage）
@@ -195,7 +197,7 @@ sudo loginctl enable-linger $USER
    ▼
 pending/agent ──► daemon dispatch ──► label: agent/doing  ← GitHub UI 实时可见
                                               │
-                                              │ worker 干活（建分支、写代码、跑测试、push、开 PR）
+                                              │ worker 干活（建分支、写代码、跑测试、push、开 PR with `Refs #N`）
                                               ▼
                                        worker 完工 →
                                           - PR  : pending/human
@@ -203,6 +205,16 @@ pending/agent ──► daemon dispatch ──► label: agent/doing  ← GitHub
                                               │
                                               ▼
                                        PR(pending/human) → 你 review
+                                              │
+                                              ▼ (你 merge PR)
+                                       daemon auto-cleanup →
+                                          - PR  : Done（PR 闭环）
+                                          - Issue: pending/human（issue 仍 open，**等你 triage** 这次 PR 是否真把问题彻底搞定）
+                                              │
+                                              ▼
+                                       你决定：
+                                          - 真闭环 → 手动关 issue（可加 Done label）
+                                          - 还差点 → 评论 + 标 pending/agent，进新一轮设计或开发
                                               ├─ 批准 / merge → 关 PR（daemon auto-cleanup）
                                               └─ 想让 agent 改 → 评论 + label: pending/agent
                                                             │

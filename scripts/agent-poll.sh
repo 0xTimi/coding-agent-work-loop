@@ -136,19 +136,21 @@ if [ "${AUTO_CLEANUP_ON_MERGE:-true}" != "false" ]; then
                 jq ".cleaned_prs += [$prnum]" "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
                 log "  auto-cleanup PR #$prnum done"
 
-                # 给 PR + 关联 issue 加 Done label（表明真彻底结束），同时去掉残留的 pending/* 标签
+                # PR：merge 完，PR 这件事真结束 → Done
                 gh pr edit "$prnum" --repo "$REPO" \
                     --add-label "$LABEL_DONE" \
                     --remove-label "$LABEL_PENDING_HUMAN" \
                     --remove-label "$LABEL_PENDING_AGENT" \
                     --remove-label "$LABEL_AGENT_DOING" 2>/dev/null || true
+
+                # Issue：**不**加 Done（issue 是长期 tracker，是否真完结由你决定）。
+                # 仅把「正在转 PR 跟踪」改成「等你 triage 看 PR 是不是真把这事彻底搞定了」。
                 gh issue edit "$issue_n" --repo "$REPO" \
-                    --add-label "$LABEL_DONE" \
+                    --add-label "$LABEL_PENDING_HUMAN" \
                     --remove-label "$LABEL_PENDING_PR" \
-                    --remove-label "$LABEL_PENDING_HUMAN" \
                     --remove-label "$LABEL_PENDING_AGENT" \
                     --remove-label "$LABEL_AGENT_DOING" 2>/dev/null || true
-                log "  Done label 加到 PR #$prnum + issue #$issue_n"
+                log "  PR #$prnum → Done；issue #$issue_n → pending/human（等你看 PR 是否真闭环）"
             else
                 log "  auto-cleanup PR #$prnum 失败（busy/dirty/hook 报错），下轮重试"
             fi
