@@ -205,7 +205,7 @@ start_session_logging() {
 # 跑一条 gh / 任意命令；非 0 时把它的 stderr 拼到 log 里（不退出脚本）。
 # 历史上脚本到处 `gh ... 2>/dev/null || log "失败"`，把真正报错全吞了，
 # 出问题（如 PAT scope 不够）时只能复现一遍才看到原因——非常痛。
-# 用法：run_gh "label 翻转" gh issue edit "$ISSUE" --add-label foo --remove-label bar
+# 用法：run_gh "label 翻转" gh_label_flip "$ISSUE" --add foo --remove bar
 run_gh() {
     local desc="$1"; shift
     local out

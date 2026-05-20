@@ -6,6 +6,32 @@ Issue：#${ISSUE}
 
 ---
 
+## 翻 label 走 REST（不用 `gh issue edit --add-label`）
+
+`gh issue/pr edit --add-label X --remove-label Y` 内部跑 GraphQL，需要 `read:org` scope；bot PAT 一般没勾，会失败。改走 REST `/repos/.../issues/<N>/labels`：
+
+```bash
+flip_label() {
+    local N="$1"; shift
+    local mode adds=() removes=()
+    while [ $# -gt 0 ]; do case "$1" in
+        --add) mode=a; shift;;
+        --remove) mode=r; shift;;
+        *) [ "$mode" = a ] && adds+=("$1"); [ "$mode" = r ] && removes+=("$1"); shift;;
+    esac; done
+    local L; for L in "${removes[@]}"; do
+        gh api -X DELETE "repos/${REPO}/issues/$N/labels/$(printf '%s' "$L" | jq -sRr @uri)" >/dev/null 2>&1 || true
+    done
+    [ ${#adds[@]} -gt 0 ] && {
+        local args=(); for L in "${adds[@]}"; do args+=(-f "labels[]=$L"); done
+        gh api -X POST "repos/${REPO}/issues/$N/labels" "${args[@]}" >/dev/null
+    }
+}
+flip_label ${ISSUE} --add <NEW> --remove <OLD>   # 示例
+```
+
+---
+
 ## 输出语言 / Output language
 
 写回 GitHub 的所有内容（issue / PR 评论、设计提案、PR body）用 ISO 639-1 代码 **`${OUTPUT_LANGUAGE}`** 对应语言：`en` = English、`zh` = 中文、`ja` = 日本語、其他同理。**不影响**：代码、commit message、分支名、本 prompt 内文。
@@ -50,7 +76,7 @@ All output written back to GitHub (issue / PR comments, design proposal, PR body
    - 用 `gh issue comment ${ISSUE} --repo ${REPO} --body "..."` 发
 
 3. **翻 label**：
-   - `gh issue edit ${ISSUE} --repo ${REPO} --add-label ${LABEL_PENDING_HUMAN} --remove-label ${LABEL_AGENT_DOING}`
+   - `flip_label ${ISSUE} --add ${LABEL_PENDING_HUMAN} --remove ${LABEL_AGENT_DOING}`
    - daemon 在你 dispatch 时已经把 issue 翻成 `${LABEL_AGENT_DOING}`；现在你完工 → 翻回 `${LABEL_PENDING_HUMAN}` 等用户
 
 4. **停 idle**。一句话回复：`已发设计方案到 issue #${ISSUE}，等待确认`

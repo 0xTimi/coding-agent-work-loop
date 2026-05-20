@@ -38,7 +38,9 @@ Issue #$ISSUE 有新评论。读 \`gh issue view $ISSUE --repo $REPO --comments\
 - 用户确认方案 → 进入开发阶段（实现 / 测试 / commit + push / 开 PR / Closes #$ISSUE）
 - 用户要求改方案 → 修订设计、重发 issue comment、idle
 - 不明确 → 反问 + idle
-完成后翻 label：gh issue edit $ISSUE --add-label $LABEL_PENDING_HUMAN --remove-label $LABEL_AGENT_DOING
+完成后翻 label（REST，绕 read:org）：
+  gh api -X POST "repos/$REPO/issues/$ISSUE/labels" -f "labels[]=$LABEL_PENDING_HUMAN"
+  gh api -X DELETE "repos/$REPO/issues/$ISSUE/labels/\$(printf '%s' "$LABEL_AGENT_DOING" | jq -sRr @uri)" || true
 EOF
 fi
 

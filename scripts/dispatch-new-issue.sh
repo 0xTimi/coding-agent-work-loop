@@ -41,8 +41,10 @@ else
 你正在处理 GitHub issue #$ISSUE（仓库 $REPO，标题：$issue_title）。
 工作目录 $WORKTREE  分支 $BRANCH。
 读 issue → 实现 → 测试通过 → commit + push → gh pr create --base main (body 含 "Closes #$ISSUE")
-拿到 PR 编号 <P> 后：gh pr edit <P> --add-label $LABEL_PENDING_HUMAN
-+ gh issue edit $ISSUE --add-label $LABEL_PENDING_HUMAN --remove-label $LABEL_PENDING_AGENT
+拿到 PR 编号 <P> 后翻 label（走 REST 避免 bot PAT 缺 read:org 的 GraphQL 调用挂）：
+  gh api -X POST "repos/$REPO/issues/<P>/labels" -f "labels[]=$LABEL_PENDING_HUMAN"
+  gh api -X POST "repos/$REPO/issues/$ISSUE/labels" -f "labels[]=$LABEL_PENDING_HUMAN"
+  gh api -X DELETE "repos/$REPO/issues/$ISSUE/labels/\$(printf '%s' "$LABEL_PENDING_AGENT" | jq -sRr @uri)" || true
 最后回一句 "PR #<P> 已开" 停 idle。
 EOF
 fi

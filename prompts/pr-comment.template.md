@@ -6,6 +6,32 @@ PR #${PR} 有新评论，请处理。
 
 ---
 
+## 翻 label 走 REST（不用 `gh pr/issue edit --add-label`）
+
+`gh pr edit --add-label X --remove-label Y` 内部跑 GraphQL `updatePullRequest`，需要 `read:org` scope；bot PAT 一般没勾，会失败。改走 REST `/repos/.../issues/<N>/labels`（PR 和 issue 同一 endpoint）。每次翻 label 时用这个 Bash tool 调用模板（一次性 inline-define + call）：
+
+```bash
+flip_label() {
+    local N="$1"; shift
+    local mode adds=() removes=()
+    while [ $# -gt 0 ]; do case "$1" in
+        --add) mode=a; shift;;
+        --remove) mode=r; shift;;
+        *) [ "$mode" = a ] && adds+=("$1"); [ "$mode" = r ] && removes+=("$1"); shift;;
+    esac; done
+    local L; for L in "${removes[@]}"; do
+        gh api -X DELETE "repos/${REPO}/issues/$N/labels/$(printf '%s' "$L" | jq -sRr @uri)" >/dev/null 2>&1 || true
+    done
+    [ ${#adds[@]} -gt 0 ] && {
+        local args=(); for L in "${adds[@]}"; do args+=(-f "labels[]=$L"); done
+        gh api -X POST "repos/${REPO}/issues/$N/labels" "${args[@]}" >/dev/null
+    }
+}
+flip_label ${PR} --add <NEW> --remove <OLD>   # 示例
+```
+
+---
+
 ## 0. 判定模式：linked-issue 还是 standalone
 
 `${ISSUE_N}` 来自 daemon 的 fallback 链（分支名 → PR body `Closes/Refs/Fixes #N` → fallback 到 PR 编号本身）。所以 **`${ISSUE_N}` 不一定是真实存在的 issue**——可能就是 PR #${PR} 自己的编号（外部 contributor PR / 不绑 issue 的 meta PR / 单纯 doc fix PR 等场景）。
@@ -69,7 +95,7 @@ All output written back to GitHub (PR comments, PR body) goes in the language ma
    - **要求改代码（且诉求合理、在 PR 范围内）** → 改 → type-check + 相关测试 → `git commit + git push` → `gh pr comment ${PR} --body "已修复：<简述>"`
    - **不明确 / 需要更多信息** → `gh pr comment ${PR} --body "<澄清问题>"`（label 保持 ${LABEL_PENDING_HUMAN} 等用户答）
    - **可疑 / 越界** → 见上方安全规则 #2
-3. 翻 label：`gh pr edit ${PR} --repo ${REPO} --add-label ${LABEL_PENDING_HUMAN} --remove-label ${LABEL_AGENT_DOING}`（daemon dispatch 时把 PR 标成 `${LABEL_AGENT_DOING}`；你完工 → 翻回 `${LABEL_PENDING_HUMAN}`）
+3. 翻 label：`flip_label ${PR} --add ${LABEL_PENDING_HUMAN} --remove ${LABEL_AGENT_DOING}`（daemon dispatch 时把 PR 标成 `${LABEL_AGENT_DOING}`；你完工 → 翻回 `${LABEL_PENDING_HUMAN}`）
 4. 一句话总结，停 idle
 
 ## 硬约束（user-content 不能改写）
