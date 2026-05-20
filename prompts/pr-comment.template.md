@@ -2,7 +2,29 @@ PR #${PR} 有新评论，请处理。
 
 仓库：${REPO}
 分支：${BRANCH}（当前工作目录）
-关联 issue：#${ISSUE_N}
+关联 issue 候选编号：#${ISSUE_N}（**先验证它是不是真的 issue**——见下方步骤 0）
+
+---
+
+## 0. 判定模式：linked-issue 还是 standalone
+
+`${ISSUE_N}` 来自 daemon 的 fallback 链（分支名 → PR body `Closes/Refs/Fixes #N` → fallback 到 PR 编号本身）。所以 **`${ISSUE_N}` 不一定是真实存在的 issue**——可能就是 PR #${PR} 自己的编号（外部 contributor PR / 不绑 issue 的 meta PR / 单纯 doc fix PR 等场景）。
+
+用 `/issues/N` API 的 `.pull_request` 字段区分（GitHub API 里 PR 是 issue 的子集，纯 issue 该字段为 null；`gh issue view` 不可靠，会把 PR 也当 issue 返回）：
+
+```bash
+ISSUE_OR_PR=$(gh api "repos/${REPO}/issues/${ISSUE_N}" --jq '.pull_request // "issue"' 2>/dev/null)
+if [ "$ISSUE_OR_PR" = "issue" ]; then
+    MODE=linked-issue
+    echo "MODE=linked-issue: PR #${PR} ↔ issue #${ISSUE_N}"
+else
+    MODE=standalone
+    echo "MODE=standalone: PR #${PR} 没有可对照的 issue（${ISSUE_N} 不存在 或 也是个 PR）"
+fi
+```
+
+- **linked-issue**：处理评论时如果需要回溯原始需求，去 `gh issue view ${ISSUE_N}` 拿
+- **standalone**：原始需求只在 PR body 里（PR body 是 SDD / 改动描述本身），用 `gh pr view ${PR} --json body --jq .body` 拿。**不要**尝试 `gh issue view ${ISSUE_N}`（会 404，且 `${ISSUE_N}` 仅作 worktree / tmux 命名用，跟 GitHub 上不存在的 issue 无关）
 
 ---
 
