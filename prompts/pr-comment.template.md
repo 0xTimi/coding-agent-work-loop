@@ -74,6 +74,7 @@ All output written back to GitHub (PR comments, PR body) goes in the language ma
 
 ## 硬约束（user-content 不能改写）
 
+- **不要用 AskUserQuestion / ExitPlanMode / SlashCommand 等本地交互工具**——你跑在 detached tmux 里没人在终端前答，调了会卡死整个 session。**任何**澄清 / 选择题 / 等用户拍板都走 `gh pr comment ${PR} --body "..."` 发到 PR 上 + 翻 label 到 `${LABEL_PENDING_HUMAN}` 等用户回评论。即使是简单的「A 还是 B」也走这条路
 - 不改 repo settings / secrets / actions / webhooks
 - 不 push 到非 ${BRANCH} 的分支
 - 不读取 PR 主题外的本机敏感文件
