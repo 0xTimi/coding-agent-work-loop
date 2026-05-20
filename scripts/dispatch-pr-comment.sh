@@ -19,9 +19,9 @@ if [ -z "$ISSUE_N" ]; then
     log "PR #$PR: pr_to_issue_num 返回空（异常状态——预期 fallback 到 PR 编号永远非空，可能 gh API 故障）"
     log "  → 翻 label 回 $LABEL_PENDING_HUMAN 防反复重试，手动检查后再 label"
     run_gh "label 翻转 (PR #$PR 兜底 pending/agent → pending/human)" \
-        gh pr edit "$PR" --repo "$REPO" \
-        --add-label "$LABEL_PENDING_HUMAN" \
-        --remove-label "$LABEL_PENDING_AGENT" || true
+        gh_label_flip "$PR" \
+        --add "$LABEL_PENDING_HUMAN" \
+        --remove "$LABEL_PENDING_AGENT" || true
     exit 0
 fi
 
@@ -67,10 +67,10 @@ inject_to_session() {
 
 flip_label() {
     # daemon dispatch 翻到 doing/agent；worker 完工时它自己翻成 pending/human
-    run_gh "label 翻转 (PR #$PR pending/agent → doing/agent)" \
-        gh pr edit "$PR" --repo "$REPO" \
-        --add-label "$LABEL_AGENT_DOING" \
-        --remove-label "$LABEL_PENDING_AGENT" || true
+    run_gh "label 翻转 (PR #$PR pending/agent → $LABEL_AGENT_DOING)" \
+        gh_label_flip "$PR" \
+        --add "$LABEL_AGENT_DOING" \
+        --remove "$LABEL_PENDING_AGENT" || true
 }
 
 # Case A: 现有 worker session

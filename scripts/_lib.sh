@@ -216,6 +216,47 @@ run_gh() {
     return 0
 }
 
+# Label 翻转 helper：走 REST API 的 /issues/N/labels endpoint，绕过 `gh pr edit
+# --add-label` 内部 GraphQL `updatePullRequest` mutation（它要 read:org scope
+# 去查 login 字段——bot PAT 一般没这个 scope，调用直接 fail）。REST 路径只要
+# repo scope 就能改 label，PR / issue 都通用（GitHub API 里 PR 是 issue 的子集）。
+# 用法：gh_label_flip <pr_or_issue_number> [--add label1 [label2 ...]] [--remove label1 ...]
+gh_label_flip() {
+    local num="$1"; shift
+    local mode=""
+    local adds=() removes=()
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --add) mode=add; shift;;
+            --remove) mode=remove; shift;;
+            *)
+                if [ "$mode" = add ]; then adds+=("$1")
+                elif [ "$mode" = remove ]; then removes+=("$1")
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    # remove first（防短暂同时有新旧 label 的窗口）
+    local L encoded
+    for L in "${removes[@]}"; do
+        encoded=$(printf '%s' "$L" | jq -sRr @uri)
+        # 404 表示 label 已经不在了——视为成功（idempotent）
+        gh api -X DELETE "repos/$REPO/issues/$num/labels/$encoded" >/dev/null 2>&1 || true
+    done
+
+    # add
+    if [ ${#adds[@]} -gt 0 ]; then
+        local args=()
+        for L in "${adds[@]}"; do
+            args+=(-f "labels[]=$L")
+        done
+        gh api -X POST "repos/$REPO/issues/$num/labels" "${args[@]}" >/dev/null 2>&1 || return 1
+    fi
+    return 0
+}
+
 # 判断一个 cwd（一般是 worktree 路径）下有没有 Claude Code 历史会话。
 # Claude 把每个 project 的 session 存在 ~/.claude/projects/<encoded-cwd>/<uuid>.jsonl
 # 其中 encoded-cwd = 把绝对路径里的 '/' 全替换成 '-'。
