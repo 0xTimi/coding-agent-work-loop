@@ -136,6 +136,17 @@ count_active_workers() {
     echo $((issues + prs))
 }
 
+# 列出活的 worker：返回 "issue #N" / "PR #N" 多行（每行一个）。
+# 用同样的 doing/agent 标签真值；给 log 用，让 user 看到 busy 的具体是谁。
+list_active_workers() {
+    {
+        gh issue list --repo "$REPO" --state open --label "$LABEL_AGENT_DOING" \
+            --json number --jq '.[] | "issue #\(.number)"' 2>/dev/null
+        gh pr list --repo "$REPO" --label "$LABEL_AGENT_DOING" \
+            --json number --jq '.[] | "PR #\(.number)"' 2>/dev/null
+    } || true
+}
+
 # 构造 tmux new-session 的 -e 参数，把 WORKER_PASS_ENV 列的 env 透传给 worker。
 # tmux 默认不继承父 shell 的 env，必须显式 -e VAR=VALUE。
 # 默认透传 GH_TOKEN（让 worker 里的 gh CLI 用正确的 PAT，而不是 fallback 到 gh auth 默认账号）。

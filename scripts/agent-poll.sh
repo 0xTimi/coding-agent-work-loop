@@ -31,10 +31,17 @@ fi
 
 log "===== poll start ====="
 
-# 计活的 worker：只算 agent 真正在 processing 的 session
-# busy 语义由当前加载的 driver agent_is_busy 提供（claude / opencode / codex 各有自己的 footer 关键字）
-active_workers=$(count_active_workers)
-log "active workers (busy): $active_workers (max=${MAX_CONCURRENT_WORKERS})"
+# 计活的 worker：用 GitHub 上 doing/agent label 作真值（label 由 daemon dispatch 时贴、
+# worker 完工时翻 pending/human；期间在 label 上就算 active）。busy 时把具体 issue/PR
+# 编号也带在 log 里，方便看 max=1 撑住的是谁。
+active_list=$(list_active_workers)
+active_workers=$(printf '%s' "$active_list" | grep -c . || true)
+if [ "$active_workers" -gt 0 ]; then
+    active_summary=$(printf '%s' "$active_list" | paste -sd ',' - | sed 's/,/, /g')
+    log "active workers (busy): $active_workers (max=${MAX_CONCURRENT_WORKERS}) — $active_summary"
+else
+    log "active workers (busy): 0 (max=${MAX_CONCURRENT_WORKERS})"
+fi
 
 # ── 1. 新 issue 派工 ──
 new_issues=$(gh issue list --repo "$REPO" --state open --label "$LABEL_PENDING_AGENT" \
