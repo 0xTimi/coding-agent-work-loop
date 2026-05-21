@@ -15,8 +15,9 @@
 #
 #   agent_is_busy <tmux_session>
 #     检查 tmux session 里的 agent 是否正在 thinking / tool use。
-#     返回 0 = busy（占并发名额）；非 0 = idle / dead。
-#     daemon `count_active_workers` 依赖这个区分活 worker。
+#     返回 0 = busy；非 0 = idle / dead。
+#     daemon 的并发计数现在用 GitHub doing/agent label 真值（见 _lib.sh:list_active_workers）
+#     不依赖这个；agent_is_busy 仍被 cleanup-issue.sh 用——cleanup 前确认 worker 不在跑。
 #
 #   agent_command_new <cwd> <session_name> <prompt_file>
 #     stdout 写一行 shell 命令字符串：在 cwd 起一个全新 session，

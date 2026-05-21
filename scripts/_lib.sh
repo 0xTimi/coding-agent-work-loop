@@ -136,15 +136,49 @@ count_active_workers() {
     echo $((issues + prs))
 }
 
-# 列出活的 worker：返回 "issue #N" / "PR #N" 多行（每行一个）。
-# 用同样的 doing/agent 标签真值；给 log 用，让 user 看到 busy 的具体是谁。
+# 列出活的 worker：以 issue 为主显示，如果正在跑 PR（doing/agent on PR）就用括号补
+# 上 PR 编号。同款 doing/agent 标签真值；给 log 用。
+#
+# 输出格式（每行一个 worker）：
+#   issue #42              ← 只 issue doing/agent（设计阶段 / 实现阶段还没开 PR）
+#   issue #51 (PR #56)     ← PR doing/agent 且通过 pr_to_issue_num 找得到关联 issue
+#   PR #43                 ← PR doing/agent 但找不到关联 issue（standalone 元 PR / external PR）
 list_active_workers() {
-    {
-        gh issue list --repo "$REPO" --state open --label "$LABEL_AGENT_DOING" \
-            --json number --jq '.[] | "issue #\(.number)"' 2>/dev/null
-        gh pr list --repo "$REPO" --label "$LABEL_AGENT_DOING" \
-            --json number --jq '.[] | "PR #\(.number)"' 2>/dev/null
-    } || true
+    local issue_nums pr_data
+    issue_nums=$(gh issue list --repo "$REPO" --state open --label "$LABEL_AGENT_DOING" \
+        --json number --jq '.[] | .number' 2>/dev/null || true)
+    pr_data=$(gh pr list --repo "$REPO" --label "$LABEL_AGENT_DOING" \
+        --json number,headRefName --jq '.[] | "\(.number)\t\(.headRefName)"' 2>/dev/null || true)
+
+    local -A handled_issue=()
+    local -a items=()
+    local n pr branch
+
+    # 先处理 PR：算 issue_n（用 pr_to_issue_num fallback 链）并合并显示
+    if [ -n "$pr_data" ]; then
+        while IFS=$'\t' read -r pr branch; do
+            n=$(pr_to_issue_num "$pr" "$branch")
+            if [ "$n" = "$pr" ]; then
+                # standalone：fallback 到 PR 编号本身（无关联 issue / 外部 PR）
+                items+=("PR #$pr")
+            else
+                items+=("issue #$n (PR #$pr)")
+                handled_issue[$n]=1
+            fi
+        done <<< "$pr_data"
+    fi
+
+    # 再处理只 issue doing/agent（且没被任何 PR 关联到）的：单独显示
+    if [ -n "$issue_nums" ]; then
+        while read -r n; do
+            [ -z "$n" ] && continue
+            if [ -z "${handled_issue[$n]:-}" ]; then
+                items+=("issue #$n")
+            fi
+        done <<< "$issue_nums"
+    fi
+
+    [ ${#items[@]} -gt 0 ] && printf '%s\n' "${items[@]}"
 }
 
 # 构造 tmux new-session 的 -e 参数，把 WORKER_PASS_ENV 列的 env 透传给 worker。
