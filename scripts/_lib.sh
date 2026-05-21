@@ -178,7 +178,12 @@ list_active_workers() {
         done <<< "$issue_nums"
     fi
 
-    [ ${#items[@]} -gt 0 ] && printf '%s\n' "${items[@]}"
+    # 注意：用 if 而不是 `[ ... ] && printf ...`——当 items 空时短路返回 exit 1，
+    # set -e 下命令替换 active_list=$(list_active_workers) 会让 caller 整个 script 死。
+    if [ ${#items[@]} -gt 0 ]; then
+        printf '%s\n' "${items[@]}"
+    fi
+    return 0
 }
 
 # 构造 tmux new-session 的 -e 参数，把 WORKER_PASS_ENV 列的 env 透传给 worker。
