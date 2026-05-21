@@ -206,14 +206,18 @@ tmux_session_name() {
 }
 
 # Agent 侧 session display name（claude -n / opencode / codex 都用作 conversation
-# 的 cosmetic 标签——出现在 /resume picker / 终端标题）。用 `<owner>/<repo>#<N>`
-# 这个 GitHub idiomatic 短引用：在 worker pane 标题里一眼能定位 issue/PR，在
-# GitHub 上引用 `#N` 自动 link。
+# 的 cosmetic 标签——出现在 /resume picker / 终端标题 / prompt box）。用完整
+# GitHub URL —— iTerm2 / kitty / wezterm / vscode / 现代 gnome-terminal 会
+# 自动识别 https://... 文本并加 hyperlink，用户从 claude UI 直接 ⌘-click 跳到
+# GitHub 那条 issue / PR。
+#
+# 用 `/issues/N` 不用 `/pull/N`：GitHub 内部对 PR 走 `/issues/N` 自动 redirect 到
+# 正确 PR 页；`/pull/N` 当 N 是真 issue 时反而 404。统一 `/issues/N` 不破不漏。
 #
 # 注：display name 不参与历史定位（agent_has_history 走 cwd），改 name 不破坏
 # 既有 conversation——老 worker --continue 仍能 resume，只是显示的 name 变了。
 worker_session_name() {
-    echo "${REPO}#$1"
+    echo "https://github.com/${REPO}/issues/$1"
 }
 
 worktree_path() {
