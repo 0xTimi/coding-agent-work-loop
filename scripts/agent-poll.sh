@@ -55,7 +55,7 @@ if [ -n "$new_issues" ]; then
         # 已有 session → 这是设计阶段已经在跑，用户 comment 后再标 pending/agent；
         # 走 issue-comment 派工：注入「读最新 comment 决定开干 / 改方案 / 反问」prompt
         if tmux has-session -t "$sess" 2>/dev/null || [ -d "$wt" ]; then
-            latest_id=$(gh api "repos/$REPO/issues/$num/comments" --jq '.[-1].id // 0' 2>/dev/null || echo 0)
+            latest_id=$(gh api --paginate "repos/$REPO/issues/$num/comments" --jq '.[-1].id // 0' 2>/dev/null || echo 0)
             last_seen=$(jq -r ".seen_issue_comments[\"$num\"] // 0" "$STATE_FILE")
             log "issue #$num 已有 worktree/session：latest_id=$latest_id last_seen=$last_seen"
             if [ "$latest_id" -gt "$last_seen" ]; then
@@ -97,9 +97,12 @@ pending_prs=$(gh pr list --repo "$REPO" --label "$LABEL_PENDING_AGENT" \
 
 if [ -n "$pending_prs" ]; then
     while IFS=$'\t' read -r prnum branch; do
-        latest_conv=$(gh api "repos/$REPO/issues/$prnum/comments" --jq '.[-1].id // 0' 2>/dev/null || echo 0)
-        latest_inline=$(gh api "repos/$REPO/pulls/$prnum/comments" --jq '.[-1].id // 0' 2>/dev/null || echo 0)
-        latest_review=$(gh api "repos/$REPO/pulls/$prnum/reviews" --jq '.[-1].id // 0' 2>/dev/null || echo 0)
+        # --paginate：gh api 默认只返第一页（per_page=30）。PR 评论 / inline review
+        # 多到 30+ 时 .[-1] 就拿不到真正最新的，daemon 误判 "无新评论" 永远不 dispatch。
+        # 实测 PR #105 撞过：37 条评论，第 31-37 漏掉 → seen 永远 == 老 latest。
+        latest_conv=$(gh api --paginate "repos/$REPO/issues/$prnum/comments" --jq '.[-1].id // 0' 2>/dev/null || echo 0)
+        latest_inline=$(gh api --paginate "repos/$REPO/pulls/$prnum/comments" --jq '.[-1].id // 0' 2>/dev/null || echo 0)
+        latest_review=$(gh api --paginate "repos/$REPO/pulls/$prnum/reviews" --jq '.[-1].id // 0' 2>/dev/null || echo 0)
         seen_conv=$(jq -r ".seen_comments[\"$prnum\"] // 0" "$STATE_FILE")
         seen_inline=$(jq -r ".seen_review_comments[\"$prnum\"] // 0" "$STATE_FILE")
         seen_review=$(jq -r ".seen_reviews[\"$prnum\"] // 0" "$STATE_FILE")
