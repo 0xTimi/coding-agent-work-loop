@@ -23,7 +23,7 @@ Morning:    10 PRs / design proposals sit on GitHub. Review them like a reviewer
             AI does another round on its own (you stay hands-off).
 ```
 
-N requests run **truly in parallel** — each issue gets its own worker / worktree / git branch, no cross-blocking. Progress is visible at a glance via GitHub labels. Mobile `gh` app handles review + comment + label, so you can keep things moving during the commute.
+N requests run **truly in parallel** — each issue gets its own worker / worktree / git branch, no cross-blocking. Progress is visible at a glance via GitHub labels. The [official GitHub mobile app](https://github.com/mobile) handles review + comment + label, so you can keep things moving during the commute.
 
 ### 2. All process + artifacts traceable by issue number
 

@@ -23,7 +23,7 @@
      AI 自己再下一轮（你这边不用动）。
 ```
 
-N 个需求**真并行**——每个 issue 独立 worker / worktree / git 分支，互不阻塞。进度看 GitHub 标签一眼清楚。手机 `gh` app 也能 review + 评论 + 改标签，通勤路上也能推进。
+N 个需求**真并行**——每个 issue 独立 worker / worktree / git 分支，互不阻塞。进度看 GitHub 标签一眼清楚。手机端 [GitHub 官方 app](https://github.com/mobile) 也能 review + 评论 + 改标签，通勤路上也能推进。
 
 ### 2. 全过程 + 交付物按 issue 号可追溯
 
