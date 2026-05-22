@@ -53,6 +53,7 @@ N 个需求**真并行**——每个 issue 独立 worker / worktree / git 分支
 - Debug 老代码："这里为啥没处理 X 情况？" → 接回那个 issue 的 session、读当时的讨论
 - 接手 / onboarding：扔给同事一个 issue 号——设计依据、替代方案、AI 的推理过程都在里面
 - Regression 复盘：回到决策点，看当时漏了什么
+- **未来的 AI agent 接手相关活**：新 issue 涉及之前 #42 改过的代码时，agent 自己跑 `gh issue view 42 --comments` 拉出完整上下文——不用每次人工给它从 0 讲"这块当时考虑过 A 没选、用 B 是因为 C..."
 
 完整保留期 + 查找 / 断点续上 SOP：[docs/persistence.md](docs/persistence.zh.md)。
 

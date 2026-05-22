@@ -53,6 +53,7 @@ Useful when:
 - Debugging old code: "why didn't they handle case X here?" → resume that issue's session, read the discussion
 - Onboarding teammates: hand them the issue # — design rationale, alternatives weighed, AI's reasoning are all there
 - Post-mortem on regressions: trace back to the decision point, see what was missed
+- **Future AI agents pick up related work**: when a *new* issue touches code from issue #42, the agent runs `gh issue view 42 --comments` itself and grabs the full prior context — no one has to spoon-feed it "here's the background, X was tried, Y didn't work because…" every single time
 
 Full retention policy + lookup / resume SOPs: [docs/persistence.md](docs/persistence.md).
 
