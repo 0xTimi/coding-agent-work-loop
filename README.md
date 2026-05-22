@@ -6,20 +6,50 @@
 >
 > Turn "babysitting AI step-by-step" into "sleep on it, review the PRs in the morning."
 
-## What it solves
+## Why use it
 
-Working with AI on code is normally **serial**: write a prompt → wait → read → respond → wait → read… You can't walk away, and a single evening barely gets a few requests done.
+Working with AI on code is normally **serial**: prompt → wait → read → respond → wait → read… You can't walk away, the AI's history is locked in some chat UI, and every keystroke is billed.
 
-This tool moves the loop into GitHub, making it **parallel**:
+This tool fixes three things at once:
+
+### 1. Sync → async parallel
+
+You stop being "the person chatting with the AI" and become "the person reviewing the AI's PRs."
 
 ```
 Before bed: open 10 issues, label each pending/agent, close laptop, sleep.
-Morning:    10 PRs / design proposals sit on GitHub. Review them like a reviewer,
+Morning:    10 PRs / design proposals sit on GitHub. Review them like a reviewer—
             merge what's good, comment + re-label what needs changes,
             AI does another round on its own (you stay hands-off).
 ```
 
-You shift from "the person chatting with the AI" to "the person reviewing the AI's PRs." N requests run in parallel, never blocking each other, and progress is visible at a glance via GitHub labels. The mobile gh app handles review + comment + label too, so you can keep things moving during the commute.
+N requests run **truly in parallel** — each issue gets its own worker / worktree / git branch, no cross-blocking. Progress is visible at a glance via GitHub labels. Mobile `gh` app handles review + comment + label, so you can keep things moving during the commute.
+
+### 2. All process + artifacts traceable by issue number
+
+Every artifact from an issue's run is filed under its **issue number**:
+
+| Artifact | Where |
+|---|---|
+| Design proposal + discussion | issue comments |
+| Code | dedicated worktree + `feature/issue-<N>` branch |
+| AI's full conversation (incl. thinking + tool calls) | `~/.claude/projects/<encoded-cwd>/<uuid>.jsonl` |
+| tmux pane history | `$STATE_DIR/sessions/<project>-issue<N>.log` |
+| Review report | PR comment |
+
+Want to resume #42 three weeks later? `cd <worktree>/issue-42 && claude --resume` drops you straight back into that exact conversation. **Not** scrubbing through hundreds of nameless AI chat sessions hoping to find "the one from before."
+
+Full retention policy + lookup / resume SOPs: [docs/persistence.md](docs/persistence.md).
+
+### 3. Cheap (Pro/Max subscription, not API tokens)
+
+| | Webhook + Anthropic API | This tool |
+|---|---|---|
+| Per-trigger model cost | Burns API tokens (every call $$) | `claude` CLI under your Pro/Max subscription — **no tokens** |
+| Idle cost | Webhook infra + standby fees | **$0** (60s polling only hits GitHub API, not the model) |
+| Long-running cost (6 months, dozens of issues/wk) | hundreds–thousands USD | flat \$20–\$200/month Pro/Max |
+
+Especially good fit for 24/7 "AI auto-reviews + auto-fixes" patterns where webhook+API costs balloon.
 
 ## How it works
 
@@ -31,14 +61,6 @@ Two trigger scenarios:
 |----------|---------|------------------|
 | New request | Add `pending/agent` to an issue | Posts a **design proposal** comment first (asking how to approach it, whether to split PRs), then on your confirmation: branch → implement → open PR |
 | Review feedback | Add `pending/agent` to a PR (with a comment) | Finds the AI session for this PR, reads the latest comment, and acts |
-
-**Cheap**: the AI is your local `claude` CLI, billed under your Pro/Max subscription — no API tokens burned. The 60s polling only hits the GitHub API, not the model.
-
-## Filed by issue number: always findable, always resumable
-
-Every artifact from an issue's run — the design proposal, the code, Claude's full conversation (thinking and tool calls included), tmux history — is tied to the **issue number**. Resuming #42 later: `cd` into the matching worktree and `claude --resume` to pick the session — you're instantly back in that conversation. Unlike a bare AI chat where you have to scrub through hundreds of nameless sessions to find "that one from before."
-
-Full list of where each artifact lives, retention policy, and SOPs for finding things / resuming work: see [docs/persistence.md](docs/persistence.md).
 
 ## What it **doesn't** do
 

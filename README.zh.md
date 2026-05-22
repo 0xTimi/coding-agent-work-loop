@@ -6,20 +6,50 @@
 >
 > 把「陪 AI 一步步写代码」变成「睡一觉起来批 PR」。
 
-## 它解决什么
+## 它好在哪
 
-平时跟 AI 写代码是**串行**的：发 prompt → 等回复 → 看 → 反馈 → 等 → 看……一步都不能走开，一晚上做不完几个需求。
+平时跟 AI 写代码是**串行**的：发 prompt → 等回复 → 看 → 反馈 → 等 → 看……一步都不能走开，AI 的历史锁在某个聊天 UI 里翻不出来，而且每个 keystroke 都在烧 token。
 
-这个工具把循环挪到 GitHub，让你**并行**：
+这工具一次性解三件事：
+
+### 1. 同步 → 异步并行
+
+你的角色从「陪 AI 对话的人」变成「批阅 AI 提的 PR 的人」。
 
 ```
-睡前：批量开 10 个 issue，每个打 pending/agent 标签，关电脑去睡。
-睡醒：GitHub 上躺着 10 个 PR / 设计提案，你像 reviewer 一样挨个看，
+睡前：批量开 10 个 issue，每个打 pending/agent，关电脑去睡。
+睡醒：GitHub 上躺着 10 个 PR / 设计提案——挨个 review，
      OK 就 merge，想改就在 PR 评论里写反馈 + 重新打标签，
      AI 自己再下一轮（你这边不用动）。
 ```
 
-你的角色从「陪 AI 对话的人」变成「批阅 AI 提的 PR 的人」。N 个需求并行跑，互不阻塞，进度看 GitHub 标签一眼清楚。手机上的 gh app 一样能 review + 评论 + 打标签，通勤路上也能推进。
+N 个需求**真并行**——每个 issue 独立 worker / worktree / git 分支，互不阻塞。进度看 GitHub 标签一眼清楚。手机 `gh` app 也能 review + 评论 + 改标签，通勤路上也能推进。
+
+### 2. 全过程 + 交付物按 issue 号可追溯
+
+每个 issue 的所有产物都按它的**编号**归档：
+
+| 产物 | 存哪 |
+|---|---|
+| 设计方案 + 讨论 | issue 评论 |
+| 代码 | 独立 worktree + `feature/issue-<N>` 分支 |
+| AI 完整对话（含思考过程 + tool 调用） | `~/.claude/projects/<encoded-cwd>/<uuid>.jsonl` |
+| tmux 历史 | `$STATE_DIR/sessions/<project>-issue<N>.log` |
+| Review 报告 | PR 评论 |
+
+3 周以后想接着干 #42？`cd <worktree>/issue-42 && claude --resume` 直接接回原对话——**不是**在几百个无名 AI 聊天 session 里翻"那个之前的"。
+
+完整保留期 + 查找 / 断点续上 SOP：[docs/persistence.md](docs/persistence.zh.md)。
+
+### 3. 便宜（吃 Pro/Max 月费、不烧 API token）
+
+| | Webhook + Anthropic API 方案 | 本工具 |
+|---|---|---|
+| 每次触发模型调用成本 | 烧 API token（每个 call $$） | 跑 Pro/Max 订阅里的 `claude` CLI——**不烧 token** |
+| Idle 时成本 | webhook infra + 待机费 | **$0**（60 秒轮询只调 GitHub API、不调模型） |
+| 长期跑 6 个月（每周几十个 issue） | 几百到几千刀 | 固定 \$20–\$200/月 Pro/Max |
+
+特别适合「24/7 AI 自动 review + 自动 fix」场景——webhook + API 方案 6 个月成本上千刀，本工具吃订阅 fixed cost。
 
 ## 工作机制
 
@@ -31,14 +61,6 @@
 |------|------|---------|
 | 新需求 | 给 issue 加 `pending/agent` | 先写一份**设计提案**当评论跟你确认（怎么做、要不要拆 PR），确认后建分支 → 实现 → 开 PR |
 | Review 反馈 | 给 PR 加 `pending/agent`（带评论） | 找到正在干这个 PR 的 AI 会话，读最新评论后改代码 / 答疑 |
-
-**便宜**：AI 是本机 `claude` 命令行，吃你 Pro/Max 月费套餐，不烧 API token；空闲的轮询只调 GitHub API，不调模型。
-
-## 按 issue 归类：事后随时找得到，断点随时能续上
-
-每个 issue 的产物——设计方案、代码、Claude 的完整对话（含思考过程和工具调用）、tmux 历史——都用 **issue 号**绑在一起。以后想接着续 #42 的活：进对应 worktree 跑 `claude --resume` 选会话，立刻接上当时的对话。不像跟 AI 单聊那样要在几百个无名 session 里翻名字。
-
-各类产物存哪、保留多久、断点恢复全 SOP，见 [docs/persistence.md](docs/persistence.zh.md)。
 
 ## 它**不**做什么
 
