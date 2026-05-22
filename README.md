@@ -6,6 +6,16 @@
 >
 > Turn "babysitting AI step-by-step" into "sleep on it, review the PRs in the morning."
 
+## What it is
+
+A GitHub-label-driven workflow for **AI coding agents** (Claude Code / OpenCode / Codex / your own). Installed as an [Agent Skill](https://www.skills.sh/) on your machine — runs a 60-second background poller that watches your repos for label triggers, dispatches a local AI worker in an isolated git worktree to do design / coding / review work, and posts everything back as GitHub comments + PR commits.
+
+Three things you should know up front:
+
+- **Local, not cloud**: the AI worker is your local `claude` (or any other supported coding CLI) — your code never leaves your machine
+- **GitHub is the interface**: labels (`pending/agent` / `pending/human` / `doing/agent`) drive everything; no web UI to learn
+- **You stay in control**: every change goes through a PR review you sign off on; the tool never auto-merges
+
 ## Why use it
 
 Working with AI on code is normally **serial**: prompt → wait → read → respond → wait → read… You can't walk away, the AI's history is locked in some chat UI, and every keystroke is billed.

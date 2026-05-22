@@ -6,6 +6,16 @@
 >
 > 把「陪 AI 一步步写代码」变成「睡一觉起来批 PR」。
 
+## 它是什么
+
+一个用 GitHub label 驱动的 **AI coding agent 工作流**（支持 Claude Code / OpenCode / Codex / 你自己的 driver）。以 [Agent Skill](https://www.skills.sh/) 形式安装在你本机——后台每 60 秒轮询一次 GitHub，看到约定的标签触发就在独立 git worktree 里起一个本机 AI worker，让它做设计 / 写代码 / review 的活，结果通过 GitHub 评论和 PR commit 留痕。
+
+三个前置认知：
+
+- **本机跑，不是云服务**：AI worker 就是你本机的 `claude`（或其他支持的 coding CLI）——代码不出本机
+- **GitHub 当 UI**：所有触发靠 label（`pending/agent` / `pending/human` / `doing/agent`），没有要学的新 web UI
+- **你掌控权**：所有改动都通过 PR review 由你签字才合入；工具从不自动 merge
+
 ## 它好在哪
 
 平时跟 AI 写代码是**串行**的：发 prompt → 等回复 → 看 → 反馈 → 等 → 看……一步都不能走开，AI 的历史锁在某个聊天 UI 里翻不出来，而且每个 keystroke 都在烧 token。
