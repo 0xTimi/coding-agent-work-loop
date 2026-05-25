@@ -36,13 +36,14 @@ EOF
     exit 1
 fi
 
-if [ ! -d "$HOST/.git" ]; then
+if [ ! -e "$HOST/.git" ]; then
     echo "❌ $HOST 不是 git 仓库（找不到 .git）"
     exit 1
 fi
 
-HOST="$(cd "$HOST" && pwd)"
-SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
+# 解析物理路径（展开符号链接），避免 macOS TCC 限制 launchd 通过 symlink 访问外部卷
+HOST="$(cd "$HOST" && pwd -P)"
+SKILL_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 [ -z "$KEY" ] && KEY="$(basename "$HOST")"
 
 # instance key 跨 systemd / launchd label 都要安全的字符（字母数字 _ - .）
@@ -65,11 +66,21 @@ case "$OS" in
         ;;
 esac
 
+# ── 检测最佳 bash（macOS 自带 bash 3.2 不支持 associative array，优先 homebrew bash）──
+if [ "$OS" = "Darwin" ] && [ -x /opt/homebrew/bin/bash ]; then
+    BASH_BIN="/opt/homebrew/bin/bash"
+elif command -v bash >/dev/null 2>&1; then
+    BASH_BIN="$(command -v bash)"
+else
+    BASH_BIN="/bin/bash"
+fi
+
 echo "── coding-agent-work-loop setup ──"
 echo "  host project: $HOST"
 echo "  skill dir:    $SKILL_DIR"
 echo "  instance key: $KEY"
 echo "  scheduler:    $SCHEDULER ($OS)"
+echo "  bash:         $BASH_BIN"
 echo
 
 # ── Worker agent 选择 ──
@@ -238,6 +249,7 @@ install_launchd() {
             -e "s|{{SKILL_DIR}}|$SKILL_DIR|g" \
             -e "s|{{ENV_FILE}}|$env_file|g" \
             -e "s|{{LOG_DIR}}|$log_dir|g" \
+            -e "s|{{BASH_BIN}}|$BASH_BIN|g" \
             "$template" > "$tmp"
         mv "$tmp" "$plist"
         # plutil 校验

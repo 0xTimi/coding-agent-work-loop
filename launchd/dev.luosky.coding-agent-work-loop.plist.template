@@ -18,9 +18,9 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/bin/bash</string>
+        <string>{{BASH_BIN}}</string>
         <string>-c</string>
-        <string>set -a; . "{{ENV_FILE}}"; set +a; exec /bin/bash "{{SKILL_DIR}}/scripts/agent-poll.sh"</string>
+        <string>set -a; . "{{ENV_FILE}}"; set +a; exec {{BASH_BIN}} "{{SKILL_DIR}}/scripts/agent-poll.sh"</string>
     </array>
 
     <key>WorkingDirectory</key>
