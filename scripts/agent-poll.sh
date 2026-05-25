@@ -191,6 +191,40 @@ if [ "${AUTO_CLEANUP_ON_MERGE:-true}" != "false" ]; then
             fi
         done <<< "$recent_merged"
     fi
+
+    # ── 4. 自动 cleanup 直接 close 的 issue（无关联 merged PR）──
+    # § 3 通过 PR 反推 issue 清理；但有的 issue 不经 PR 直接被 close（duplicate / won't
+    # fix / 决定不做了）—— § 3 看不到。这里扫最近 closed issue 兜底。
+    # cleanup-issue.sh 是 idempotent（worktree / session 不存在就 skip），即便 § 3 已清
+    # 过的 issue 这里再跑一次也无害。
+    if [ "$(jq -r '.cleaned_issues // "MISSING"' "$STATE_FILE")" = "MISSING" ]; then
+        initial=$(gh issue list --repo "$REPO" --state closed --limit 200 \
+            --json number --jq '[.[].number]' 2>/dev/null || echo '[]')
+        [ -z "$initial" ] && initial='[]'
+        tmp=$(mktemp)
+        jq ".cleaned_issues = $initial" "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
+        log "auto-cleanup bootstrap (closed issues): 标记 $(echo "$initial" | jq length) 个历史 closed issue 为已清"
+    fi
+
+    recent_closed=$(gh issue list --repo "$REPO" --state closed --limit 30 \
+        --json number --jq '.[].number' 2>/dev/null || true)
+
+    if [ -n "$recent_closed" ]; then
+        while read -r issnum; do
+            [ -z "$issnum" ] && continue
+            if jq -e ".cleaned_issues | index($issnum)" "$STATE_FILE" >/dev/null 2>&1; then
+                continue
+            fi
+            log "auto-cleanup closed issue #$issnum → cleanup-issue.sh"
+            if bash "$SCRIPT_DIR/cleanup-issue.sh" "$issnum" 2>&1; then
+                tmp=$(mktemp)
+                jq ".cleaned_issues += [$issnum]" "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
+                log "  auto-cleanup closed issue #$issnum done"
+            else
+                log "  auto-cleanup closed issue #$issnum 失败（busy/dirty），下轮重试"
+            fi
+        done <<< "$recent_closed"
+    fi
 fi
 
 log "===== poll done ====="
