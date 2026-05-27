@@ -81,7 +81,7 @@ if [ -d "$WORKTREE" ]; then
         log "PR #$PR -> 在 $TMUX_SESSION 里 resume agent=$WORKER_AGENT 之前的会话"
         CMD="$(agent_command_resume "$WORKTREE" "$WORKER_SESSION" "$PROMPT_FILE")"
     else
-        log "PR #$PR -> 从 worktree 起全新 $WORKER_AGENT session $TMUX_SESSION（cwd 无历史）"
+        log "PR #$PR -> 从 worktree 起全新 $WORKER_AGENT session ${TMUX_SESSION}（cwd 无历史）"
         CMD="$(agent_command_new "$WORKTREE" "$WORKER_SESSION" "$PROMPT_FILE")"
     fi
     tmux_env=()

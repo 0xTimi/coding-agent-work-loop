@@ -38,7 +38,7 @@ if [ -n "$TEMPLATE" ]; then
 else
     # 兜底：内联 minimal prompt
     cat > "$PROMPT_FILE" <<EOF
-你正在处理 GitHub issue #$ISSUE（仓库 $REPO，标题：$issue_title）。
+你正在处理 GitHub issue #$ISSUE（仓库 $REPO，标题：${issue_title}）。
 工作目录 $WORKTREE  分支 $BRANCH。
 读 issue → 实现 → 测试通过 → commit + push → gh pr create --base main (body 含 "Closes #$ISSUE")
 拿到 PR 编号 <P> 后翻 label（走 REST 避免 bot PAT 缺 read:org 的 GraphQL 调用挂）：

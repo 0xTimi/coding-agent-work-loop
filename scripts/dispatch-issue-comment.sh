@@ -65,10 +65,10 @@ fi
 # Case B: worktree 还在，session 死了 → 重起 session（有历史就 resume）
 if [ -d "$WORKTREE" ]; then
     if agent_has_history "$WORKTREE"; then
-        log "issue #$ISSUE -> 在 $TMUX_SESSION 里 resume agent=$WORKER_AGENT 之前的会话"
+        log "issue #$ISSUE -> 在 ${TMUX_SESSION} 里 resume agent=$WORKER_AGENT 之前的会话"
         CMD="$(agent_command_resume "$WORKTREE" "$WORKER_SESSION" "$PROMPT_FILE")"
     else
-        log "issue #$ISSUE -> 从 worktree 起全新 $WORKER_AGENT session $TMUX_SESSION（cwd 无历史）"
+        log "issue #$ISSUE -> 从 worktree 起全新 $WORKER_AGENT session ${TMUX_SESSION}（cwd 无历史）"
         CMD="$(agent_command_new "$WORKTREE" "$WORKER_SESSION" "$PROMPT_FILE")"
     fi
     tmux_env=()
