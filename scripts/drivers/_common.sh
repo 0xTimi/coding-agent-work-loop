@@ -43,16 +43,56 @@ encoded_cwd() {
 }
 
 # ── 默认 prompt 注入 ──
+# 三阶段：dismiss 残留 modal → paste prompt + Enter → verify-and-retry
+# 避免之前常踩的"prompt 进了输入框但没 submit、worker 卡 doing/agent 假在跑"。
+#
+# 失败模式有几种：
+#   1. claude 弹了 rate-session "How is Claude doing this session?" modal，Enter 被弹窗吃 dismiss
+#   2. claude permission prompt / approval popup 接 Enter
+#   3. claude 刚启动还没 ready，paste 进了但 Enter 时机不对
+#   4. paste 还在处理（bracketed-paste 进度），Enter 抢跑
+#
+# 兜底：注入后等 + tail pane 看是否进 busy 状态（footer 出现 "esc to interrupt"
+# 表明 claude 在 streaming token = prompt 真 submit）；没进 busy 就补 Enter，最多
+# 重试 N 次。
 default_inject_prompt() {
     local sess="$1"
     local prompt_file="$2"
     local buf
+
+    # 1. dismiss 可能拦着的 modal —— 但仅当 claude 不在 busy 时（busy 时 Escape 会中断 thinking）
+    if ! tmux capture-pane -t "$sess" -p 2>/dev/null | tail -5 | grep -q "esc to interrupt"; then
+        tmux send-keys -t "$sess" Escape
+        sleep 0.2
+        tmux send-keys -t "$sess" Escape   # 第二下兜底 nested modal
+        sleep 0.3
+    fi
+
+    # 2. paste prompt（bracketed paste 让 claude 当一段而不是逐行）
     buf=$(mktemp)
     cat "$prompt_file" > "$buf"
     tmux load-buffer -t "$sess" "$buf"
     rm -f "$buf"
     tmux paste-buffer -t "$sess" -p
+    sleep 0.5   # 给 claude UI 处理 paste 的时间，防 Enter 抢跑
+
     tmux send-keys -t "$sess" Enter
+
+    # 3. verify-and-retry：等 claude 进 busy 才算 submit 成功
+    local retries=0
+    while [ $retries -lt 5 ]; do
+        sleep 2
+        if tmux capture-pane -t "$sess" -p 2>/dev/null | tail -5 | grep -q "esc to interrupt"; then
+            return 0
+        fi
+        # 没进 busy → prompt 还卡输入框 / Enter 被某个 modal 吃了 → 补 Enter
+        tmux send-keys -t "$sess" Enter
+        retries=$((retries + 1))
+    done
+
+    echo "[default_inject_prompt] WARN: 5 次 retry 后 $sess 仍未进 busy；prompt 可能仍卡输入框" >&2
+    echo "[default_inject_prompt]       手动检查：tmux capture-pane -t $sess -p | tail -20" >&2
+    return 1
 }
 
 # ── 加载 driver ──
