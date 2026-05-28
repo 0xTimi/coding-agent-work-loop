@@ -34,6 +34,8 @@ if [ -n "$TEMPLATE" ]; then
         -e "s|\${LABEL_AGENT_DOING}|$LABEL_AGENT_DOING|g" \
         -e "s|\${LABEL_PENDING_PR}|$LABEL_PENDING_PR|g" \
         -e "s|\${OUTPUT_LANGUAGE}|$OUTPUT_LANGUAGE|g" \
+        -e "s|\${TMUX_SESSION}|$TMUX_SESSION|g" \
+        -e "s|\${TASK_START_TS}|$(date -Iseconds)|g" \
         "$TEMPLATE" > "$PROMPT_FILE"
 else
     # 兜底：内联 minimal prompt
