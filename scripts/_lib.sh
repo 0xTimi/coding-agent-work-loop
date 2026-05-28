@@ -62,6 +62,10 @@ OUTPUT_LANGUAGE="${OUTPUT_LANGUAGE:-en}"
 # 默认 claude → 行为完全等同未引入 driver 抽象前。
 WORKER_AGENT="${WORKER_AGENT:-claude}"
 
+# Outbound GitHub 评论里附时间+token 元数据 footer（on / off）。默认 on。
+# 项目级 prompt 模板可读 ${COMMENT_FOOTER}，自行决定本项目是否加 footer。
+COMMENT_FOOTER="${COMMENT_FOOTER:-on}"
+
 mkdir -p "$STATE_DIR"
 LOG_FILE="$STATE_DIR/poll.log"
 
@@ -343,6 +347,13 @@ find_prompt_template() {
 # 放在文件末尾，确保 _lib.sh 自己的函数都已定义；driver 注入的函数
 # (agent_is_busy / agent_has_history / agent_command_new/resume) 之后被 dispatch
 # 脚本 + cleanup-issue.sh 在执行时取到。
+_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/drivers/_common.sh"
+source "$_LIB_DIR/drivers/_common.sh"
 source_driver "$WORKER_AGENT" || exit 2
+
+# ── Token usage 脚本路径（项目级 prompt 通过 ${AGENT_TOKEN_USAGE_SCRIPT} 占位调用）──
+# 优先 drivers/token-usage/<agent>.sh；没有 fallback _default.sh（输出空、worker
+# 落"未知"兜底）。新增 driver 时按需在 token-usage/ 加 <agent>.sh 即可。
+AGENT_TOKEN_USAGE_SCRIPT="$_LIB_DIR/drivers/token-usage/${WORKER_AGENT}.sh"
+[ -f "$AGENT_TOKEN_USAGE_SCRIPT" ] || AGENT_TOKEN_USAGE_SCRIPT="$_LIB_DIR/drivers/token-usage/_default.sh"

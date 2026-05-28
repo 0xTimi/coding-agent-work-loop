@@ -45,6 +45,8 @@ if [ -n "$TEMPLATE" ]; then
         -e "s|\${OUTPUT_LANGUAGE}|$OUTPUT_LANGUAGE|g" \
         -e "s|\${TMUX_SESSION}|$TMUX_SESSION|g" \
         -e "s|\${TASK_START_TS}|$(date '+%Y-%m-%d %H:%M:%S')|g" \
+        -e "s|\${COMMENT_FOOTER}|$COMMENT_FOOTER|g" \
+        -e "s|\${AGENT_TOKEN_USAGE_SCRIPT}|$AGENT_TOKEN_USAGE_SCRIPT|g" \
         "$TEMPLATE" > "$PROMPT_FILE"
 else
     cat > "$PROMPT_FILE" <<EOF
