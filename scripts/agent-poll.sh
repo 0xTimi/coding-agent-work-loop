@@ -142,8 +142,12 @@ pending_prs=$(gh pr list --repo "$REPO" --label "$LABEL_PENDING_AGENT" \
 
 if [ -n "$pending_prs" ]; then
     while IFS=$'\t' read -r prnum branch; do
+        # 算 session/worktree（PR 走 issue_n 链；standalone fallback PR 编号自己）
+        issue_n=$(pr_to_issue_num "$prnum" "$branch")
+        sess="$(tmux_session_name "$issue_n")"
+
         # --paginate：gh api 默认只返第一页（per_page=30）。PR 评论 / inline review
-        # 多到 30+ 时 .[-1] 就拿不到真正最新的，daemon 误判 "无新评论" 永远不 dispatch。
+        # 多到 30+ 时 .[-1] 就拿不到真正最新的，少 paginate daemon 看不见后面 7 条。
         # 实测 PR #105 撞过：37 条评论，第 31-37 漏掉 → seen 永远 == 老 latest。
         latest_conv=$(gh api --paginate "repos/$REPO/issues/$prnum/comments" --jq '.[-1].id // 0' 2>/dev/null || echo 0)
         latest_inline=$(gh api --paginate "repos/$REPO/pulls/$prnum/comments" --jq '.[-1].id // 0' 2>/dev/null || echo 0)
@@ -152,19 +156,27 @@ if [ -n "$pending_prs" ]; then
         seen_inline=$(jq -r ".seen_review_comments[\"$prnum\"] // 0" "$STATE_FILE")
         seen_review=$(jq -r ".seen_reviews[\"$prnum\"] // 0" "$STATE_FILE")
         log "PR #$prnum: conv=$latest_conv/$seen_conv inline=$latest_inline/$seen_inline review=$latest_review/$seen_review"
-        if [ "$latest_conv" -gt "$seen_conv" ] || \
-           [ "$latest_inline" -gt "$seen_inline" ] || \
-           [ "$latest_review" -gt "$seen_review" ]; then
-            log "dispatch PR #$prnum comment"
-            # 透传最大的 ID 给 dispatch（仅用于 prompt 文件命名去重，不参与语义）
-            kick_id=$(printf '%s\n%s\n%s\n' "$latest_conv" "$latest_inline" "$latest_review" | sort -rn | head -1)
-            if bash "$SCRIPT_DIR/dispatch-pr-comment.sh" "$prnum" "$branch" "$kick_id"; then
-                tmp=$(mktemp)
-                jq ".seen_comments[\"$prnum\"] = $latest_conv | .seen_review_comments[\"$prnum\"] = $latest_inline | .seen_reviews[\"$prnum\"] = $latest_review" \
-                    "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
-            else
-                log "PR #$prnum 派工失败（state 不更新，下轮重试）"
-            fi
+
+        # busy 时不打断（保护正在干活的 worker；新评论 / 重标 都等下一轮 idle）
+        if tmux has-session -t "$sess" 2>/dev/null && agent_is_busy "$sess"; then
+            log "PR #$prnum: agent 正在忙，跳过本轮"
+            continue
+        fi
+
+        # Dispatch 触发条件（跟 §1 issue 派工一致）：label=pending/agent（已过滤）+ 不忙。
+        # **不**依赖 comment id 变化——label 翻 pending/agent 本身就是 user 明确意图
+        # 信号（可能是新评论 + 重标、可能是没新评论纯重派工恢复死掉的 worker）。
+        # dispatch 后 daemon 在 § Case A/B 翻 label 到 doing/agent，下轮 daemon 不会
+        # 再 trigger 同 PR（label 不是 pending/agent 了），不会死循环。
+        log "dispatch PR #$prnum comment"
+        # 透传最大的 ID 给 dispatch（仅用于 prompt 文件命名去重，不参与语义）
+        kick_id=$(printf '%s\n%s\n%s\n' "$latest_conv" "$latest_inline" "$latest_review" | sort -rn | head -1)
+        if bash "$SCRIPT_DIR/dispatch-pr-comment.sh" "$prnum" "$branch" "$kick_id"; then
+            tmp=$(mktemp)
+            jq ".seen_comments[\"$prnum\"] = $latest_conv | .seen_review_comments[\"$prnum\"] = $latest_inline | .seen_reviews[\"$prnum\"] = $latest_review" \
+                "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
+        else
+            log "PR #$prnum 派工失败（state 不更新，下轮重试）"
         fi
     done <<< "$pending_prs"
 fi
