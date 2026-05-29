@@ -291,8 +291,44 @@ start_session_logging() {
         printf '\n===== %s session=%s opened =====\n' \
             "$(date -Iseconds)" "$sess"
     } >> "$log_path"
-    tmux pipe-pane -o -t "$sess" "cat >> '$log_path'" 2>/dev/null || \
-        log "  ⚠️ pipe-pane 失败：$sess → $log_path"
+    # pipe-pane 偶发失败几乎都是 `tmux new-session -d` 刚返回、pane 尚未就绪的 race，
+    # 或 worker 进程已秒退 session 没了。先重试一次（0.3s 后），仍失败才报警——
+    # 报警此时基本等价于"worker 启动即死"（详见 verify_fresh_session 的 capture）。
+    if ! tmux pipe-pane -o -t "$sess" "cat >> '$log_path'" 2>/dev/null; then
+        sleep 0.3
+        tmux pipe-pane -o -t "$sess" "cat >> '$log_path'" 2>/dev/null || \
+            log "  ⚠️ pipe-pane 失败：$sess → $log_path（session 可能已秒退）"
+    fi
+}
+
+# 起完 fresh session 后探活并 capture 秒退死因。
+# 前置条件：caller 必须在 `tmux new-session` 时就用 `\; set-option -w remain-on-exit on`
+#   把 remain-on-exit 链式设上——否则亚毫秒级秒退会抢在本函数前把 pane 销毁、capture 到空。
+# - 活着：关掉 remain-on-exit（恢复正常——claude 自然退出时 session 应当销毁），return 0
+# - 死了：把 pane 内容（含报错）抓进 session log + daemon log，kill-session
+#   （保持 "has-session==false == worker 死" 的语义，self-heal 才能正常翻 label），return 1
+# 只在没有 has-session-based fallback 的路径（dispatch-new-issue）用；
+# 注入/resume 路径靠各自 Case 逻辑，不在这里碰。
+verify_fresh_session() {
+    local sess="$1"
+    local wait_s="${2:-2}"
+    sleep "$wait_s"
+    local dead
+    dead="$(tmux list-panes -t "$sess" -F '#{pane_dead}' 2>/dev/null | head -1)"
+    if [ "$dead" = "1" ] || ! tmux has-session -t "$sess" 2>/dev/null; then
+        log "  ❌ $sess 启动后 ${wait_s}s 内秒退，capture pane 死因："
+        local log_path
+        log_path="$(session_log_path "$sess")"
+        {
+            printf '\n===== %s session=%s 秒退，pane capture =====\n' \
+                "$(date -Iseconds)" "$sess"
+            tmux capture-pane -t "$sess" -p -S -200 2>/dev/null | sed '/^[[:space:]]*$/d'
+        } | tee -a "${log_path:-/dev/null}" | tail -25 | sed 's/^/      /' | tee -a "$LOG_FILE" >&2
+        tmux kill-session -t "$sess" 2>/dev/null || true
+        return 1
+    fi
+    tmux set-option -w -t "$sess" remain-on-exit off 2>/dev/null || true
+    return 0
 }
 
 # 跑一条 gh / 任意命令；非 0 时把它的 stderr 拼到 log 里（不退出脚本）。

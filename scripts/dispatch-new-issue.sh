@@ -61,10 +61,25 @@ tmux_env=()
 while IFS= read -r -d '' _tmux_e; do
     tmux_env+=("$_tmux_e")
 done < <(tmux_env_args)
-tmux new-session -d -s "$TMUX_SESSION" "${tmux_env[@]}" -c "$WORKTREE" "$CMD"
+# remain-on-exit 用 `\;` 链在同一次 tmux 调用里设上：worker 秒退时 pane 留尸，
+# verify_fresh_session 才 capture 得到死因。隔语句再设会被亚毫秒级秒退抢跑（race）。
+tmux new-session -d -s "$TMUX_SESSION" "${tmux_env[@]}" -c "$WORKTREE" "$CMD" \
+    \; set-option -w -t "$TMUX_SESSION" remain-on-exit on
 
 # 4.5 pane 输出旁路到日志文件，session 退出后仍可回看
 start_session_logging "$TMUX_SESSION"
+
+# 4.6 探活：fresh 路径没有 has-session-based fallback，worker 偶发秒退时
+#     必须就地 capture 死因（否则 pipe-pane 一挂日志全空），并保持 label 干净
+#     —— 没活起来就不翻 doing/agent，留在 pending/agent 等下轮重试，避免假"进行中"。
+if ! verify_fresh_session "$TMUX_SESSION"; then
+    log "dispatch-new-issue: #$ISSUE worker 秒退 → 翻 $LABEL_PENDING_AGENT 回 $LABEL_PENDING_HUMAN（死因见上方 capture，偶发的话重标 pending/agent 即可重试）"
+    run_gh "label 翻转 (issue #$ISSUE 秒退 pending/agent → pending/human)" \
+        gh issue edit "$ISSUE" --repo "$REPO" \
+        --add-label "$LABEL_PENDING_HUMAN" \
+        --remove-label "$LABEL_PENDING_AGENT" || true
+    exit 1
+fi
 
 # 5. 立即翻 label 到 doing/agent（worker 完工时它会自己翻成 pending/human）
 run_gh "label 翻转 (issue #$ISSUE pending/agent → doing/agent)" \
