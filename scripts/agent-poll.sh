@@ -79,12 +79,35 @@ fi
 # worker 完工时翻 pending/human；期间在 label 上就算 active）。busy 时把具体 issue/PR
 # 编号也带在 log 里，方便看 max=1 撑住的是谁。
 active_list=$(list_active_workers)
-active_workers=$(printf '%s' "$active_list" | grep -c . || true)
+# 真·全局并发上限：active_keys 收所有在跑 worker 的 issue_n（每行第一个数字就是 key——
+# "PR #123 ..."→123、"issue #45 (PR #46) ..."→45、"issue #45 ..."→45）。下面所有派工路径
+# 都过 reserve_slot：同一 worker（key 已在集合）复用 slot 防自死锁；新 worker 满了排队。
+declare -A active_keys=()
+while IFS= read -r _aw_line; do
+    [ -z "$_aw_line" ] && continue
+    _aw_key=$(printf '%s' "$_aw_line" | grep -oE '[0-9]+' | head -1)
+    if [ -n "$_aw_key" ]; then active_keys[$_aw_key]=1; fi
+done <<< "$active_list"
+active_workers=${#active_keys[@]}
+
+# 返回 0=可派工（slot 已占或复用），1=已满需排队。用 if/fi 不用 `[ ] && return`
+# 短路（避免 set -e 下 cond 为假把 status 1 漏给 caller）。
+reserve_slot() {
+    local key="$1"
+    if [ -n "${active_keys[$key]:-}" ]; then
+        return 0
+    fi
+    if [ "${#active_keys[@]}" -ge "${MAX_CONCURRENT_WORKERS:-1}" ]; then
+        return 1
+    fi
+    active_keys[$key]=1
+    return 0
+}
 if [ "$active_workers" -gt 0 ]; then
     active_summary=$(printf '%s' "$active_list" | paste -sd ',' - | sed 's/,/, /g')
-    log "active workers (busy): $active_workers (max=${MAX_CONCURRENT_WORKERS}) — $active_summary"
+    log "active workers (doing/agent): $active_workers (max=${MAX_CONCURRENT_WORKERS:-1}) — $active_summary"
 else
-    log "active workers (busy): 0 (max=${MAX_CONCURRENT_WORKERS})"
+    log "active workers (doing/agent): 0 (max=${MAX_CONCURRENT_WORKERS:-1})"
 fi
 
 # ── 1. 新 issue 派工 ──
@@ -107,6 +130,10 @@ if [ -n "$new_issues" ]; then
                 log "issue #$num: agent 正在忙，跳过本轮"
                 continue
             fi
+            if ! reserve_slot "$num"; then
+                log "issue #$num: 已达并发上限 max=${MAX_CONCURRENT_WORKERS:-1}，重派工排队等下一轮"
+                continue
+            fi
             log "dispatch issue-comment for #$num"
             if bash "$SCRIPT_DIR/dispatch-issue-comment.sh" "$num" "$latest_id"; then
                 tmp=$(mktemp)
@@ -118,14 +145,12 @@ if [ -n "$new_issues" ]; then
         fi
 
         # 没 worktree / session → 全新 issue 第一次派工（走设计分析阶段）
-        if [ "$active_workers" -ge "${MAX_CONCURRENT_WORKERS:-1}" ]; then
-            log "已达并发上限，issue #$num 排队等下一轮"
-            break
+        if ! reserve_slot "$num"; then
+            log "已达并发上限 max=${MAX_CONCURRENT_WORKERS:-1}，issue #$num 排队等下一轮"
+            continue
         fi
         log "dispatch new issue #$num: $title"
-        if bash "$SCRIPT_DIR/dispatch-new-issue.sh" "$num"; then
-            active_workers=$((active_workers + 1))
-        else
+        if ! bash "$SCRIPT_DIR/dispatch-new-issue.sh" "$num"; then
             log "派工 issue #$num 失败"
         fi
     done <<< "$new_issues"
@@ -160,6 +185,10 @@ if [ -n "$pending_prs" ]; then
         # busy 时不打断（保护正在干活的 worker；新评论 / 重标 都等下一轮 idle）
         if tmux has-session -t "$sess" 2>/dev/null && agent_is_busy "$sess"; then
             log "PR #$prnum: agent 正在忙，跳过本轮"
+            continue
+        fi
+        if ! reserve_slot "$issue_n"; then
+            log "PR #$prnum: 已达并发上限 max=${MAX_CONCURRENT_WORKERS:-1}，排队等下一轮"
             continue
         fi
 
