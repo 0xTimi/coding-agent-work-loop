@@ -7,6 +7,9 @@ OnBootSec=30s
 # 注：这里不能用变量，systemd timer 不展开 EnvironmentFile。如果要改 interval，
 # 编辑此模板或用 systemctl --user edit coding-agent-poll@%i.timer 做 drop-in。
 OnUnitActiveSec=60s
+# AccuracySec 不设默认 1min，会把 60s 间隔攒批拉成 ~2min（实际间隔 ≈ OnUnitActiveSec + AccuracySec）。
+# 设 5s：保留一点攒批余地，又把实际间隔锁在 ~60-65s（即"1 分钟"）。
+AccuracySec=5s
 Persistent=true
 
 [Install]
