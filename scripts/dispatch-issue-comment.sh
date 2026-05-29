@@ -70,18 +70,34 @@ fi
 
 # Case B: worktree 还在，session 死了 → 重起 session（有历史就 resume）
 if [ -d "$WORKTREE" ]; then
-    if agent_has_history "$WORKTREE"; then
-        log "issue #$ISSUE -> 在 ${TMUX_SESSION} 里 resume agent=$WORKER_AGENT 之前的会话"
-        CMD="$(agent_command_resume "$WORKTREE" "$WORKER_SESSION" "$PROMPT_FILE")"
-    else
-        log "issue #$ISSUE -> 从 worktree 起全新 $WORKER_AGENT session ${TMUX_SESSION}（cwd 无历史）"
-        CMD="$(agent_command_new "$WORKTREE" "$WORKER_SESSION" "$PROMPT_FILE")"
-    fi
     tmux_env=()
     while IFS= read -r -d '' _tmux_e; do
         tmux_env+=("$_tmux_e")
     done < <(tmux_env_args)
-    tmux new-session -d -s "$TMUX_SESSION" "${tmux_env[@]}" -c "$WORKTREE" "$CMD"
+
+    # B1: 先试 resume（如有历史）
+    used_resume=0
+    if agent_has_history "$WORKTREE"; then
+        log "issue #$ISSUE -> 在 ${TMUX_SESSION} 里 resume agent=$WORKER_AGENT 之前的会话"
+        CMD="$(agent_command_resume "$WORKTREE" "$WORKER_SESSION" "$PROMPT_FILE")"
+        tmux new-session -d -s "$TMUX_SESSION" "${tmux_env[@]}" -c "$WORKTREE" "$CMD"
+        used_resume=1
+        # claude --continue 可能 resume 到异常 state（之前 worker 留下的 Rewind UI 等）
+        # 然后立即异常退出 → tmux session 立即关。等 2s 看是否还在
+        sleep 2
+    fi
+
+    # B2: 没历史 or resume 起来后立即死 → 降级 fresh new（claude -n）
+    if ! tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
+        if [ "$used_resume" = 1 ]; then
+            log "issue #$ISSUE -> resume 启动后 2s 内 session 死了（可能 transcript state 异常），降级 fresh $WORKER_AGENT session（丢 conversation history、prompt 含 issue context 仍可工作）"
+        else
+            log "issue #$ISSUE -> 从 worktree 起全新 $WORKER_AGENT session ${TMUX_SESSION}（cwd 无历史）"
+        fi
+        CMD="$(agent_command_new "$WORKTREE" "$WORKER_SESSION" "$PROMPT_FILE")"
+        tmux new-session -d -s "$TMUX_SESSION" "${tmux_env[@]}" -c "$WORKTREE" "$CMD"
+    fi
+
     start_session_logging "$TMUX_SESSION" 2>/dev/null || true
     flip_label
     exit 0
