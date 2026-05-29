@@ -202,13 +202,24 @@ list_active_workers() {
 # 列在 WORKER_PASS_ENV 但 env 里没设的变量，会 log warn（典型：手动跑 daemon 但
 # 没 export GH_TOKEN —— 否则 worker 静默走 gh 默认 token，导致多账号下 403）。
 tmux_env_args() {
-    local vars="${WORKER_PASS_ENV:-GH_TOKEN}"
+    # PATH 硬透传：worker 跑 claude / git / node 等 binary 全靠 PATH 找。tmux new-session
+    # 启的 child shell **继承的是 tmux server 启动时的 PATH**，**不继承** dispatch script
+    # 自己的 PATH——如果 tmux server 启动时 user 自装 binary 目录（~/.hermes/node/bin、
+    # ~/.local/bin/foo 等）不在 PATH 里，worker exec claude 立即 `command not found`、
+    # session exit 127 死掉。dispatch script 自己跑时 PATH 是 systemd EnvironmentFile
+    # 给的、含 claude；显式 -e PATH=$PATH 把这份 PATH 传给 worker session 才稳。
+    # conf 不用列 PATH（即便列也 dedupe 不重复透传）。
+    local vars="PATH ${WORKER_PASS_ENV:-GH_TOKEN}"
+    local seen=""
     for var in $vars; do
+        case " $seen " in *" $var "*) continue ;; esac
+        seen="$seen $var"
         local val
         eval "val=\${$var:-}"
         if [ -n "$val" ]; then
             printf -- '-e\0%s=%s\0' "$var" "$val"
-        else
+        elif [ "$var" != "PATH" ]; then
+            # PATH 当前 shell 一定有，不可能空；其他 var 空就 warn
             # 写 stderr，agent-poll.sh 的 log 会捕获到
             echo "[coding-agent] WARN: WORKER_PASS_ENV 含 '$var' 但当前 env 没设；worker 不会拿到它。" >&2
             echo "[coding-agent]       手动跑 daemon 请先 export $var=...（systemd 路径自动从 EnvironmentFile 注入）" >&2
