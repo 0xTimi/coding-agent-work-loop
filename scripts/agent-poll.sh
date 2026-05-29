@@ -31,6 +31,50 @@ fi
 
 log "===== poll start ====="
 
+# ── 0. Zombie label self-heal ──
+# label=doing/agent 但对应 tmux session 不存在 = 假阳性 active：worker 进程死掉时
+# 没机会自己翻 label 回 pending/human（claude crash / tmux server 重启 / 手动 kill
+# 等），daemon 后续看 label 仍当 active worker、撑满 max_concurrent。
+# 这里在算 active 之前先扫一遍 doing/agent label 项，把 session 不存在的翻回
+# pending/human + log 警告，让 user 看到"worker 死了，需要看一眼"。下一轮 user
+# 重标 pending/agent 即可触发 fallback resume。
+zombie_pr_data=$(gh pr list --repo "$REPO" --label "$LABEL_AGENT_DOING" \
+    --json number,headRefName --jq '.[] | "\(.number)\t\(.headRefName)"' 2>/dev/null || true)
+zombie_issue_nums=$(gh issue list --repo "$REPO" --state open --label "$LABEL_AGENT_DOING" \
+    --json number --jq '.[] | .number' 2>/dev/null || true)
+
+self_heal_one() {
+    local kind="$1"   # "PR" / "issue"
+    local n="$2"      # 真编号（PR 编号 or issue 编号）
+    local issue_n="$3"   # 用来推 session name（PR 走 pr_to_issue_num 链；issue 自己）
+    local sess
+    sess="$(tmux_session_name "$issue_n")"
+    if tmux has-session -t "$sess" 2>/dev/null; then
+        return 0   # session 真活着，不是 zombie
+    fi
+    log "⚠️ self-heal: $kind #$n session=$sess 不存在 → 翻 $LABEL_AGENT_DOING 回 $LABEL_PENDING_HUMAN"
+    run_gh "label 翻转 (self-heal $kind #$n doing/agent → pending/human)" \
+        gh_label_flip "$n" \
+        --add "$LABEL_PENDING_HUMAN" \
+        --remove "$LABEL_AGENT_DOING" || true
+}
+
+if [ -n "$zombie_pr_data" ]; then
+    while IFS=$'\t' read -r pr branch; do
+        n=$(pr_to_issue_num "$pr" "$branch")
+        self_heal_one "PR" "$pr" "$n"
+    done <<< "$zombie_pr_data"
+fi
+if [ -n "$zombie_issue_nums" ]; then
+    while read -r issue_n; do
+        [ -z "$issue_n" ] && continue
+        # 跳过被 PR 关联过的（上面 PR pass 已处理同 session_name）
+        # 简单做法：让 self_heal_one 内部用 has-session 兜底——已 self-heal 过的 session
+        # 不存在但 label 已翻、issue 没在 zombie_issue_nums 里出现，这里只处理纯 issue 的
+        self_heal_one "issue" "$issue_n" "$issue_n"
+    done <<< "$zombie_issue_nums"
+fi
+
 # 计活的 worker：用 GitHub 上 doing/agent label 作真值（label 由 daemon dispatch 时贴、
 # worker 完工时翻 pending/human；期间在 label 上就算 active）。busy 时把具体 issue/PR
 # 编号也带在 log 里，方便看 max=1 撑住的是谁。
