@@ -79,8 +79,9 @@ done <<< "$(printf '%s\n' "$WORKSPACE_SUBREPOS")"
 git -C "$PROJECT_ROOT" worktree remove --force "$PARENT_WT" 2>/dev/null || true
 
 # ── 4. parent issue 收尾 ──
+_summary="$(printf '%s ' "${MERGED[@]}")"
 gh issue comment "$ISSUE" --repo "$REPO" --body \
-  "✅ 一键合并完成（$MERGE_METHOD）：$(printf '%s ' "${MERGED[@]}")。worktree 已清理，issue 关闭。"
+  "✅ 一键合并完成 (method=${MERGE_METHOD}): ${_summary}. worktree 已清理, issue 已关闭。"
 gh_label_flip "$ISSUE" --add "$LABEL_DONE" \
   --remove "doing/merge" "$LABEL_PENDING_PR" "$LABEL_PENDING_HUMAN" "$LABEL_PENDING_AGENT" "$LABEL_AGENT_DOING" || true
 gh issue close "$ISSUE" --repo "$REPO" 2>/dev/null || true
