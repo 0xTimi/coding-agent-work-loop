@@ -156,6 +156,20 @@ if [ -n "$new_issues" ]; then
     done <<< "$new_issues"
 fi
 
+# ── 1.5 一键合并（pending/merge，workspace 扩展）──
+# parent issue 标 pending/merge → 跑 merge-task.sh，按序合并所有子 repo PR。
+# merge-task.sh 开头即把 pending/merge 翻成 doing/merge，故下一轮不会重复触发；
+# 成功→Done，失败→pending/human（都不再是 pending/merge）。
+merge_issues=$(gh issue list --repo "$REPO" --state open --label "pending/merge" \
+    --json number --jq '.[].number' 2>/dev/null || true)
+if [ -n "$merge_issues" ]; then
+    while read -r mnum; do
+        [ -z "$mnum" ] && continue
+        log "dispatch merge-task for #$mnum"
+        bash "$SCRIPT_DIR/merge-task.sh" "$mnum" || log "merge-task #$mnum 失败（见上；人工处理后重标 pending/merge 重试）"
+    done <<< "$merge_issues"
+fi
+
 # ── 2. PR 评论派工 ──
 # PR 上的「评论」其实有三种，存三个不同 endpoint，ID 序列也是独立的：
 #   - /issues/N/comments  ← Conversation tab 的对话评论
