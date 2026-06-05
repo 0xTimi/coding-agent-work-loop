@@ -59,7 +59,7 @@ All output written back to GitHub (issue / PR comments, design proposal, PR body
 
 1. **读 issue**：`gh issue view ${ISSUE} --repo ${REPO} --comments`
    - 抓提出者：`gh issue view ${ISSUE} --repo ${REPO} --json author --jq .author.login` → 后续 @ 它
-   - **标题整理（确定性约定）**：**仅当**标题正好是单个 `.`（用户显式请 AI 起标题的信号）时 → 据正文提炼一句**简洁、描述性**的标题（用 `${OUTPUT_LANGUAGE}`，≤一行）并 `gh issue edit ${ISSUE} --repo ${REPO} --title "<新标题>"`。**标题是其它任何内容（包括你觉得含糊的）→ 一律不动**，尊重用户自己写的标题，绝不擅自改写。
+   - **标题整理（确定性约定）**：**仅当**标题（去掉首尾空格、不分大小写后）正好是 `.` `。` `?` `？` `tbd` `auto` 之一（**半角全角标点都算**；用户显式请 AI 起标题的信号）时 → 据正文提炼一句**简洁、描述性**的标题（用 `${OUTPUT_LANGUAGE}`，≤一行）并 `gh issue edit ${ISSUE} --repo ${REPO} --title "<新标题>"`。**标题是其它任何内容 → 一律不动**，绝不擅自改写用户自己写的标题。
 
 2. **整理设计方案**，写成 issue comment 发到 issue 上：
    - 必含的段（项目专属模板可以加更多，参考 `.agents/skills/coding-agent-work-loop/prompts/` 覆盖）：
