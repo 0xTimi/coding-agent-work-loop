@@ -27,7 +27,7 @@ elif git show-ref --verify --quiet "refs/remotes/origin/$BRANCH"; then
     log "  origin/$BRANCH 已存在，签出"
     git fetch origin "$BRANCH"
 else
-    log "  新建分支 $BRANCH ← origin/$BASE_BRANCH（先 fetch 取最新，避免基于陈旧本地 main）"
+    log "  新建分支 $BRANCH ← origin/${BASE_BRANCH}（先 fetch 取最新，避免基于陈旧本地 main）"
     git fetch origin "$BASE_BRANCH" --quiet
     git branch "$BRANCH" "origin/$BASE_BRANCH"
 fi
