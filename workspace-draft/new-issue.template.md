@@ -65,6 +65,7 @@ All output written back to GitHub (issue / PR comments, design proposal, PR body
    - 必含的段（项目专属模板可以加更多，参考 `.agents/skills/coding-agent-work-loop/prompts/` 覆盖）：
      - **功能范围**：做什么、明确不做什么（防 scope creep）
      - **跨 repo 分解**（workspace 专属）：列出要动哪几个子 repo、每个各做什么、合并顺序/依赖（例：先 Gateway 加接口、再 Web 接 UI）。不需要动的子 repo 别碰。
+     - **⚠️ 合并顺序依赖**（workspace 专属）：若某子 repo 改动**必须等另一个 PR / issue 先合并**才能动（建立在其产物上），在设计里**显式标出依赖 + 建议合并顺序**。重要约定：开发阶段遇到此情形**绝不 busy-wait 死等**（占满并发名额会饿死别的任务）——而是先推进不依赖的部分、把卡依赖的部分**释放名额**（评论 + 翻 `${LABEL_PENDING_HUMAN}` + 停 idle），等被依赖项合并后由 operator 重标 `${LABEL_PENDING_AGENT}` 续做。
      - **核心思路 / 关键决策**：怎么实现、为什么这么做
      - **数据模型 / API 设计**（如适用）
      - **UI / 交互**（如适用）

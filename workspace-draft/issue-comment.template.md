@@ -72,6 +72,15 @@ All output written back to GitHub (issue / PR comments, PR body) goes in the lan
 
 按设计方案的「跨 repo 分解」，**逐个要动的子 repo**（在 `${WORKTREE}/<子repo>/` 目录内，各自独立 git、已在 `${BRANCH}` 分支、已配好 bot 身份）：
 
+> **⚠️ 跨任务依赖：发现要等「别的 PR / issue 先合并」时，绝不原地 busy-wait。**
+> 若某个子 repo 的改动依赖**另一个尚未合并的 PR / issue**（典型：本任务建立在另一任务的产物上，需它先 merge），**绝不要**用 `while sleep` / 轮询 / `gh ... --watch` 等任何方式占着 worker 进程死等——那会一直占用并发名额（`MAX_CONCURRENT_WORKERS`），把别的任务饿死，是这套 label 状态机最忌讳的「不释放接力棒」。正确做法是**释放名额、等被唤醒**：
+> 1. 不依赖的子 repo 改动可以照常先推进；只把「卡依赖」的部分按下面释放。
+> 2. 评论说明依赖：`gh issue comment ${ISSUE} --repo ${REPO} --body "本任务依赖 <被依赖的 PR/issue 链接> 先合并；合并后请重标 \`${LABEL_PENDING_AGENT}\` 我继续。"`
+> 3. 翻 label：`flip_label ${ISSUE} --add ${LABEL_PENDING_HUMAN} --remove ${LABEL_AGENT_DOING}`
+> 4. 一句话回复 `本任务卡在依赖 <X>，已释放名额等其合并`，**停 idle 退出**（让出 worker 名额）。
+>
+> 被依赖项合并后，operator 重标 `${LABEL_PENDING_AGENT}`，daemon 会重新唤醒你（fallback resume 现有 worktree）继续未完成的部分。
+
 1. 实现：改代码 → TDD 优先补测试 → type-check / 相关测试 / lint 通过为止
 2. 在该子 repo 目录内 commit + `git push -u origin ${BRANCH}`
 3. `gh pr create --repo GigleAI/<子repo> --base main --title "..." --body "..."`，body 里**根据设计阶段确认的「闭环关系」选关键词**：
