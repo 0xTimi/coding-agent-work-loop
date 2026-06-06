@@ -82,6 +82,7 @@ All output written back to GitHub (issue / PR comments, PR body) goes in the lan
 > 被依赖项合并后，operator 重标 `${LABEL_PENDING_AGENT}`，daemon 会重新唤醒你（fallback resume 现有 worktree）继续未完成的部分。
 
 1. 实现：改代码 → TDD 优先补测试 → type-check / 相关测试 / lint 通过为止
+   > **push / 开 PR 前必须同步最新 main**：在该子 repo 里先 `git fetch origin && git merge origin/main`（有冲突就解，再重跑相关检查/测试），保证你的分支基于**最新** main。否则慢任务 / 被 park 的任务 / 并行任务很容易落后 main，合并时冲突或漏掉别人刚合的改动。
 2. 在该子 repo 目录内 commit + `git push -u origin ${BRANCH}`
 3. `gh pr create --repo GigleAI/<子repo> --base main --title "..." --body "..."`，body 里**根据设计阶段确认的「闭环关系」选关键词**：
    - **完整闭环**（单子 repo 就解决）→ `Closes GigleAI/GigleMDD#${ISSUE}`（merge 自动关 parent issue）
