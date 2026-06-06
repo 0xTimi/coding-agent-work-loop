@@ -22,22 +22,37 @@ TASK_BRANCH="$(branch_name "$ISSUE")"    # agent/task-<issue>
 log "merge-task #$ISSUE: 方法=$MERGE_METHOD 分支=$TASK_BRANCH"
 gh_label_flip "$ISSUE" --add "doing/merge" --remove "pending/merge" || true
 
+# 兜底：一旦翻成 doing/merge 后脚本意外崩溃（非主动 exit），把 issue 拉回 pending/human，
+# 不让它卡死在 doing/merge（那样 daemon 只认 pending/merge，永远不会再触发）。
+# 主动错误分支会先置 HANDLED=1，故此 trap 只兜「没预料到的崩溃」。
+HANDLED=0
+_merge_trap() {
+    local code=$?
+    [ "$code" = 0 ] && return
+    [ "$HANDLED" = 1 ] && return
+    log "  ❌ merge-task #$ISSUE 意外崩溃 (exit=$code) → 拉回 pending/human"
+    gh issue comment "$ISSUE" --repo "$REPO" --body \
+      "⚠️ 一键合并脚本意外中断（exit=${code}），已停在安全状态。请检查后重新标 \`pending/merge\` 重试。" 2>/dev/null || true
+    gh_label_flip "$ISSUE" --add "$LABEL_PENDING_HUMAN" --remove "doing/merge" || true
+}
+trap _merge_trap EXIT
+
 # ── 1. 收集各子 repo 待合 PR（按 WORKSPACE_SUBREPOS 顺序）──
 declare -a MERGE_PLAN=()   # 每项 "subrepo_name|pr_number"
 while read -r name remote; do
     [ -z "${name:-}" ] && continue
     pr=$(gh pr list --repo "GigleAI/$name" --state open --head "$TASK_BRANCH" \
             --json number,mergeStateStatus --jq '.[0] // empty' 2>/dev/null || true)
-    [ -z "$pr" ] && { log "  $name: 无 open PR（agent/task-$ISSUE），跳过"; continue; }
+    [ -z "$pr" ] && { log "  $name: 无 open PR（agent/task-${ISSUE}），跳过"; continue; }
     prnum=$(echo "$pr" | jq -r .number)
     state=$(echo "$pr" | jq -r .mergeStateStatus)
     log "  $name: PR #$prnum (mergeState=$state)"
     if [ "$state" != "CLEAN" ] && [ "$state" != "UNSTABLE" ]; then
         log "  ❌ $name PR #$prnum 不可合 (state=$state) → 终止"
         gh issue comment "$ISSUE" --repo "$REPO" --body \
-          "⚠️ 一键合并中止：\`GigleAI/$name#$prnum\` 当前不可合并（状态 $state，可能有冲突/检查未过）。请人工处理后重标 \`pending/merge\`。"
+          "⚠️ 一键合并中止：\`GigleAI/$name#$prnum\` 当前不可合并（状态 ${state}，可能有冲突/检查未过）。请人工处理后重标 \`pending/merge\`。"
         gh_label_flip "$ISSUE" --add "$LABEL_PENDING_HUMAN" --remove "doing/merge" || true
-        exit 1
+        HANDLED=1; exit 1
     fi
     MERGE_PLAN+=("$name|$prnum")
 done <<< "$(printf '%s\n' "$WORKSPACE_SUBREPOS")"
@@ -61,7 +76,7 @@ for item in "${MERGE_PLAN[@]}"; do
         gh issue comment "$ISSUE" --repo "$REPO" --body \
           "⚠️ 一键合并中途失败于 \`GigleAI/$name#$prnum\`。已合并：${MERGED[*]:-无}。请人工处理后重标 \`pending/merge\`。"
         gh_label_flip "$ISSUE" --add "$LABEL_PENDING_HUMAN" --remove "doing/merge" || true
-        exit 1
+        HANDLED=1; exit 1
     fi
 done
 
