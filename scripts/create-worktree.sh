@@ -58,6 +58,27 @@ for rel in ${COPY_TO_WORKTREE:-}; do
     fi
 done
 
+# 3c. 长程任务护栏（opt-in：issue 打 `long-horizon` label 才装）。
+# 装一个 command 型 Stop hook：只要 parent issue 还挂 `doing/agent`，就不许
+# worker 停——它必须先交接（开 PR→pending/PR，或留言→pending/human 翻掉
+# doing/agent）。挡住「大任务半途停」+「闷头退出留下 doing/agent 僵尸名额」。
+# 普通任务不打这 label → 无 hook，行为照旧（想停就停）。
+REPO="${REPO:-GigleAI/GigleMDD}"
+if command -v gh >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 \
+   && gh issue view "$ISSUE" --repo "$REPO" --json labels --jq '[.labels[].name]' 2>/dev/null | grep -q '"long-horizon"'; then
+    SETTINGS="$WORKTREE_DIR/.claude/settings.local.json"
+    mkdir -p "$(dirname "$SETTINGS")"
+    HOOK_CMD="L=\$(gh issue view ${ISSUE} --repo ${REPO} --json labels --jq '[.labels[].name]|join(\",\")' 2>/dev/null) || exit 0; case \",\$L,\" in *\",doing/agent,\"*) echo 'Issue #${ISSUE} 仍是 doing/agent：本阶段还没交接，先完成并翻 label（开 PR→pending/PR，或留言→pending/human）再停。' >&2; exit 2;; *) exit 0;; esac"
+    base='{}'; [ -f "$SETTINGS" ] && base="$(cat "$SETTINGS" 2>/dev/null || echo '{}')"
+    if printf '%s' "$base" | jq --arg c "$HOOK_CMD" '.hooks.Stop = [{"hooks":[{"type":"command","command":$c}]}]' > "$SETTINGS.tmp" 2>/dev/null; then
+        mv "$SETTINGS.tmp" "$SETTINGS"
+        log "  long-horizon：已装 Stop hook（doing/agent 期间禁止 stop）"
+    else
+        rm -f "$SETTINGS.tmp"
+        log "  ⚠️ 写 Stop hook 失败，跳过（不阻塞）"
+    fi
+fi
+
 # 4. 跑 setup 命令
 if [ -n "${WORKTREE_SETUP_CMD:-}" ] && [ "${WORKTREE_SETUP_CMD}" != ":" ]; then
     log "  跑 WORKTREE_SETUP_CMD: $WORKTREE_SETUP_CMD"
